@@ -14,7 +14,7 @@ int exec(char*, char**);
 int open(const char*, int);
 int mknod(const char*, short, short);
 int unlink(const char*);
-int fstat(int fd, struct stat*);
+int fstat(int fd, struct stat*);        // return information about a file, in the buffer pointed to by statbuf
 int link(const char*, const char*);
 int mkdir(const char*);
 int chdir(const char*);
@@ -30,6 +30,7 @@ char* strcpy(char*, const char*);
 void *memmove(void*, const void*, int);
 char* strchr(const char*, char c);
 int strcmp(const char*, const char*);
+char *strcat(char *dest, const char *src);
 void fprintf(int, const char*, ...);
 void printf(const char*, ...);
 char* gets(char*, int max);
