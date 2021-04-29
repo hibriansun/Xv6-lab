@@ -2,6 +2,7 @@
 #define T_FILE    2   // File
 #define T_DEVICE  3   // Device
 
+// File metadata info struct
 struct stat {
   int dev;     // File system's disk device
   uint ino;    // Inode number

@@ -36,8 +36,8 @@ strlen(const char *s)
 char*
 strcat(char *dest, const char *src){
   char *d = dest + strlen(dest);
-  char *s = src;
-  while(*src){
+  const char *s = src;
+  while(*s){
     *d = *s;
     ++s;
     ++d;

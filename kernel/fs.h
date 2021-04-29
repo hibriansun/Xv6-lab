@@ -53,6 +53,7 @@ struct dinode {
 // Directory is a file containing a sequence of dirent structures.
 #define DIRSIZ 14
 
+// 返回目录中文件项(link，一个文件可以对应多个路径)的基本结构体信息，多次读取同一目录流，每次顺延返回目录中下一文件项信息于struct dirent
 struct dirent {
   ushort inum;
   char name[DIRSIZ];
