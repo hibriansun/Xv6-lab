@@ -291,6 +291,9 @@ fork(void)
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
+  // Copy mask number from parent to child
+  np->mask = p->mask; 
+
   pid = np->pid;
 
   np->state = RUNNABLE;
