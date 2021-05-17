@@ -450,9 +450,9 @@ wait(uint64 addr)
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
 //  - choose a process to run.
-//  - swtch to start running that process.
+//  - switch to start running that process.
 //  - eventually that process transfers control
-//    via swtch back to the scheduler.
+//    via switch back to the scheduler.
 void
 scheduler(void)
 {
@@ -473,7 +473,7 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
-        swtch(&c->context, &p->context);
+        switch(&c->context, &p->context);
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -513,7 +513,7 @@ sched(void)
     panic("sched interruptible");
 
   intena = mycpu()->intena;
-  swtch(&p->context, &mycpu()->context);
+  switch(&p->context, &mycpu()->context);
   mycpu()->intena = intena;
 }
 
@@ -529,7 +529,7 @@ yield(void)
 }
 
 // A fork child's very first scheduling by scheduler()
-// will swtch to forkret.
+// will switch to forkret.
 void
 forkret(void)
 {

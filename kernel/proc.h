@@ -1,4 +1,4 @@
-// Saved registers for kernel context switches.
+// Saved `registers` for kernel context switches.
 struct context {
   uint64 ra;
   uint64 sp;
@@ -20,7 +20,7 @@ struct context {
 
 // Per-CPU state.
 struct cpu {
-  struct proc *proc;          // The process running on this cpu, or null.
+  struct proc *proc;          // `The process` running on this cpu, or null.
   struct context context;     // swtch() here to enter scheduler().
   int noff;                   // Depth of push_off() nesting.
   int intena;                 // Were interrupts enabled before push_off()?
@@ -80,24 +80,26 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
+// 进程存在时的几种状态 -- 创建 阻塞 就绪 运行 僵尸 ？
 enum procstate { UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+// 对每一个进程的几种状态碎片内核使用如下数据结构来维护
 // Per-process state
 struct proc {
   struct spinlock lock;
 
-  // p->lock must be held when using these:
-  enum procstate state;        // Process state
+  // p->lock must `be held` when using these:
+  enum procstate state;        // Process state -- one of the most important process's pieces
   struct proc *parent;         // Parent process
   void *chan;                  // If non-zero, sleeping on chan
   int killed;                  // If non-zero, have been killed
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
 
-  // these are private to the process, so p->lock need not be held.
-  uint64 kstack;               // Virtual address of kernel stack
+  // these are private to the process, so p->lock need `not be held`.
+  uint64 kstak;                // Virtual address of kernel stack -- one of the most important process's pieces
   uint64 sz;                   // Size of process memory (bytes)
-  pagetable_t pagetable;       // User page table
+  pagetable_t pagetable;       // User page table -- one of the most important process's pieces
   struct trapframe *trapframe; // data page for trampoline.S
   struct context context;      // swtch() here to run process
   struct file *ofile[NOFILE];  // Open files

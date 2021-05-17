@@ -20,7 +20,7 @@ OBJS = \
   $K/main.o \
   $K/vm.o \
   $K/proc.o \
-  $K/swtch.o \
+  $K/switch.o \
   $K/trampoline.o \
   $K/trap.o \
   $K/syscall.o \

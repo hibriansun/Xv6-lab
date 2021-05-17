@@ -20,7 +20,7 @@ struct run {
 
 struct {
   struct spinlock lock;
-  struct run *freelist;
+  struct run *freelist;   // Free space addresses list
 } kmem;
 
 void
@@ -63,7 +63,7 @@ kfree(void *pa)
 }
 
 // Allocate one 4096-byte page of physical memory.
-// Returns a pointer that the kernel can use.
+// Returns a pointer that the `kernel` can use.
 // Returns 0 if the memory cannot be allocated.
 void *
 kalloc(void)
