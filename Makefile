@@ -20,7 +20,7 @@ OBJS = \
   $K/main.o \
   $K/vm.o \
   $K/proc.o \
-  $K/switch.o \
+  $K/swtch.o \
   $K/trampoline.o \
   $K/trap.o \
   $K/syscall.o \
@@ -149,6 +149,7 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
+	$U/_trace\
 
 
 
