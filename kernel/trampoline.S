@@ -15,7 +15,7 @@ trampoline:
 .globl uservec
 uservec:    
 	#
-        # trap.c sets stvec to point here, so
+        # trap.c sets stvec(trap handler register) to point here, so
         # traps from user space start here,
         # in supervisor mode, but with a
         # user page table.

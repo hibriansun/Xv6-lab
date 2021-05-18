@@ -150,7 +150,7 @@ syscall(void)
     // After calling system calls, print the system call info if it is traced.
     // 不采用p->mask == (1 << num)作为判断条件是因为所要追踪的系统调用mask: p->mask 可能为所有系统调用
     if(p->mask & (1 << num)){
-      printf("%d: syscall %s -> %d\n", p->pid, callnames[num - 1], p->trapframe->a0);
+      printf("%d: syscall %s -> %d\n", p->pid, callnames[num], p->trapframe->a0);
     } 
   } else {
     printf("%d %s: unknown sys call %d\n",
