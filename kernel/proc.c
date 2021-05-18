@@ -696,3 +696,22 @@ procdump(void)
     printf("\n");
   }
 }
+
+
+// Get the number of process whose `state` is not **UNUSED**
+// 遍历进程数组，查看进程状态，非UNUSED计数
+uint64
+getNProc(void)
+{
+  uint64 count = 0;
+
+  for(int i = 0; i < NPROC; ++i){
+      acquire(&(proc[i].lock));
+      if(proc[i].state != UNUSED){
+        ++count;
+      }
+      release(&(proc[i].lock));
+  }
+
+  return count;
+}

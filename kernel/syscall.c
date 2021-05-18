@@ -105,6 +105,7 @@ extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);
 
 // A table of function pointers  --  Global Var
 // 系统调用数组 -- System Call Array
@@ -131,6 +132,7 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_trace]   sys_trace,
+[SYS_sysinfo] sys_sysinfo,
 };
 
 void
@@ -141,7 +143,7 @@ syscall(void)
   char* callnames[] = {
     "", "fork", "exit", "wait", "pipe", "read", "kill", "exec",
     "fstat", "chdir", "dup", "getpid", "sbrk", "sleep", "uptime",
-    "open", "write", "mknod", "unlink", "link", "mkdir", "close", "trace"
+    "open", "write", "mknod", "unlink", "link", "mkdir", "close", "trace", "sysinfo"
   };
 
   num = p->trapframe->a7;
