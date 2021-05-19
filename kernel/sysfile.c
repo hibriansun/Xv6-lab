@@ -16,6 +16,8 @@
 #include "file.h"
 #include "fcntl.h"
 
+#include "sysinfo.h"
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -67,7 +69,7 @@ sys_dup(void)
 }
 
 uint64
-sys_read(void)
+  sys_read(void)
 {
   struct file *f;
   int n;
@@ -482,5 +484,28 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+// 从内核中拷贝struct sysinfo到用户空间
+uint64
+sys_sysinfo(void)
+{
+  struct sysinfo curr;
+  struct proc *p = myproc();
+  uint64 addr;
+  
+  curr.freemem = getFreeMem();
+  curr.nproc = getNProc();
+
+  // 将来自用户空间的struct info*参数与addr地址联系在一起了
+  if(argaddr(0, &addr) < 0)
+    return -1;
+
+  // Copy kernel data to struct sysinfo of user page
+  if(copyout(p->pagetable, addr, (char*)&curr, sizeof(curr)) < 0){
+    return -1;
+  }
+
   return 0;
 }

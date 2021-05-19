@@ -95,3 +95,16 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// 接收参数并给proc结构体中mask复制
+uint64
+sys_trace(void)
+{
+  int mask;
+  if(argint(0, &mask) < 0){
+    return -1;
+  }
+
+  myproc()->mask = mask;
+  return 0;
+}

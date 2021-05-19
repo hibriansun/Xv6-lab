@@ -1,8 +1,10 @@
 struct stat;
 struct rtcdate;
+struct sysinfo;
 
 // system calls
 int fork(void);
+// 这个属性告诉编译器函数不会返回，这可以用来抑制关于未达到代码路径的错误。 C库函数abort（）和exit（）都使用此属性声明
 int exit(int) __attribute__((noreturn));
 int wait(int*);
 int pipe(int*);
@@ -23,6 +25,8 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int trace(int);
+int sysinfo(struct sysinfo *);
 
 // ulib.c
 int stat(const char*, struct stat*);

@@ -154,12 +154,10 @@ UPROGS=\
 	$U/_find\
 	$U/_primes\
 	$U/_xargs\
-
-ifeq ($(LAB),syscall)
-UPROGS += \
 	$U/_trace\
-	$U/_sysinfotest
-endif
+	$U/_sysinfotest\
+
+
 
 ifeq ($(LAB),trap)
 UPROGS += \
