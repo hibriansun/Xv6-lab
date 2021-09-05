@@ -79,7 +79,7 @@ runcmd(struct cmd *cmd)
     fprintf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 
-  case REDIR:
+  case REDIR:                                       // IO(文件描述符)重定向
     rcmd = (struct redircmd*)cmd;
     close(rcmd->fd);
     if(open(rcmd->file, rcmd->mode) < 0){
@@ -307,6 +307,7 @@ gettoken(char **ps, char *es, char **q, char **eq)
   return ret;
 }
 
+// 检索空格隔开的单个命令 && 是否存在被检索字符
 int
 peek(char **ps, char *es, char *toks)
 {
@@ -330,7 +331,7 @@ parsecmd(char *s)
   char *es;
   struct cmd *cmd;
 
-  es = s + strlen(s);
+  es = s + strlen(s);       // es: end of s
   cmd = parseline(&s, es);
   peek(&s, es, "");
   if(s != es){
