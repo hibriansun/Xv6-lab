@@ -16,6 +16,7 @@ uint64 mscratch0[NCPU * 32];
 // assembly code in kernelvec.S for machine-mode timer interrupt.
 extern void timervec();
 
+// 执行一些只有在机器模式下才允许的配置，然后切换到监督者模式
 // entry.S jumps here in machine mode on stack0.
 void
 start()

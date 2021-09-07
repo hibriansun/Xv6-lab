@@ -487,7 +487,9 @@ sys_pipe(void)
   return 0;
 }
 
-// 从内核中拷贝struct sysinfo到用户空间
+// 从内核中拷贝**当前**系统的内存和进程信息struct sysinfo到用户空间
+// 该系统调用参数是struct sysinfo *，用于让系统调用填充信息以在用户态读取
+// 该函数在内核态新建临时变量curr，调用getFreeMem getNProc填充字段信息后，使用copyout将curr数据传给用户调用系统调用传进来的用户态参数
 uint64
 sys_sysinfo(void)
 {
@@ -498,7 +500,7 @@ sys_sysinfo(void)
   curr.freemem = getFreeMem();
   curr.nproc = getNProc();
 
-  // 将来自用户空间的struct info*参数与addr地址联系在一起了
+  // 将来自用户空间的struct info*参数与调用系统调用填入struct sysinfo * addr参数地址联系在一起了
   if(argaddr(0, &addr) < 0)
     return -1;
 

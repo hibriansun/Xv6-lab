@@ -8,6 +8,7 @@
 
 struct cpu cpus[NCPU];
 
+// 每个CPU上正在运行的进程
 struct proc proc[NPROC];
 
 struct proc *initproc;
