@@ -96,7 +96,7 @@ sys_uptime(void)
   return xticks;
 }
 
-// 接收参数并给proc结构体中mask复制
+// 接收参数并给proc结构体中mask赋值
 uint64
 sys_trace(void)
 {
