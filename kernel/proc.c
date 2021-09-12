@@ -152,6 +152,7 @@ freeproc(struct proc *p)
   p->state = UNUSED;
 }
 
+// proc_pagetable分配一个没有使用的页表
 // Create a user page table for a given process,
 // with no user memory, but with trampoline pages.
 pagetable_t
@@ -213,22 +214,23 @@ userinit(void)
 {
   struct proc *p;
 
-  p = allocproc();
+  p = allocproc();      // xv6的第一个进程，其pid = 1
   initproc = p;
   
   // allocate one user page and copy init's instructions
   // and data into it.
-  uvminit(p->pagetable, initcode, sizeof(initcode));
+  // initcode是个全局变量字符数组
+  uvminit(p->pagetable, initcode, sizeof(initcode));      // 第一个进程的代码段就是proc.c下的initcode，将这段代码的虚实映射关系添加到用户进程页表中
   p->sz = PGSIZE;
 
   // prepare for the very first "return" from kernel to user.
-  p->trapframe->epc = 0;      // user program counter
+  p->trapframe->epc = 0;      // user program counter     // 设定用户进程的pc指针初始值为0，这就是sleep.c中断点被触发的原因
   p->trapframe->sp = PGSIZE;  // user stack pointer
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->state = RUNNABLE;
+  p->state = RUNNABLE;        // 该进程等待调度
 
   release(&p->lock);
 }
