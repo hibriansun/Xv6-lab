@@ -657,6 +657,7 @@ namex(char *path, int nameiparent, char *name)
   return ip;
 }
 
+// 打开二进制文件路径
 struct inode*
 namei(char *path)
 {

@@ -29,13 +29,14 @@ exec(char *path, char **argv)
   }
   ilock(ip);
 
-  // Check ELF header
+  // Check ELF header 检查文件是否包含一个ELF二进制文件
   if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;
+  // 如果ELF头有正确的"魔法数字"，exec就会认为该二进制文件是正确的类型
   if(elf.magic != ELF_MAGIC)
     goto bad;
 
-  if((pagetable = proc_pagetable(p)) == 0)
+  if((pagetable = proc_pagetable(p)) == 0)    // proc_pagetable分配一个没有使用的页表
     goto bad;
 
   // Load program into memory.
@@ -116,6 +117,11 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
+  if(p->pid==1){
+    printf("page table %p\n", p->pagetable);
+    vmprint(p->pagetable, 0);
+  }
+  // printf("===%s\n", p->name);
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
@@ -128,6 +134,7 @@ exec(char *path, char **argv)
   return -1;
 }
 
+// 加载每一个段到内存中
 // Load a program segment into pagetable at virtual address va.
 // va must be page-aligned
 // and the pages from va to va+sz must already be mapped.

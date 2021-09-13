@@ -188,6 +188,7 @@ w_mtvec(uint64 x)
 
 // supervisor address translation and protection;
 // holds the address of the page table.
+// 写satp (Write satp)
 static inline void 
 w_satp(uint64 x)
 {
@@ -332,7 +333,8 @@ sfence_vma()
 #define PTE_X (1L << 3)
 #define PTE_U (1L << 4) // 1 -> user can access
 
-// shift a physical address to the right place for a PTE.
+// shift a `P`hysical `A`ddress to the right place for a PTE.
+// 56位的物理地址的高44位用给PTE的PPN(物理页号)
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
 
 #define PTE2PA(pte) (((pte) >> 10) << 12)
@@ -340,9 +342,9 @@ sfence_vma()
 #define PTE_FLAGS(pte) ((pte) & 0x3FF)
 
 // extract the three 9-bit page table indices from a virtual address.
-#define PXMASK          0x1FF // 9 bits
-#define PXSHIFT(level)  (PGSHIFT+(9*(level)))
-#define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
+#define PXMASK          0x1FF // 9 bits  (1 1111 1111)
+#define PXSHIFT(level)  (PGSHIFT+(9*(level)))   // 12位表示页内偏移 9位表示某级页表页号
+#define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)    // `& mask` 是只取后9位
 
 // one beyond the highest possible virtual address.
 // MAXVA is actually one bit less than the max allowed by

@@ -12,6 +12,8 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
+extern pagetable_t kernel_pagetable;
+
 int nextpid = 1;
 struct spinlock pid_lock;
 
@@ -121,6 +123,14 @@ found:
     return 0;
   }
 
+  // Alloc new kernel page table for each process own
+  // p->kernel_pt = proc_user_kernel_pagetable();
+  // if (!p->kernel_pt) {
+  //   freeproc(p);
+  //   release(&p->lock);
+  //   return 0;
+  // }
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -129,6 +139,27 @@ found:
 
   return p;
 }
+
+// Only allocation realted to entry 0 at level 0 in user kernel page is exclusive to each process
+// 每个进程的内核页表的第0级的第0个entry下申请的页都是每个进程不一样的，不共享的，而其他的PTE内容都是共享global kernel_pagetable的
+// Thus, kfree the user kernel pagetable and allocation related to entry 0 at level 0
+// static void proc_free_user_kernel_pagetable(pagetable_t kernel_pt) {
+//   // Only kfree entry 0 at level 0 user kernel pagetable
+//   pte_t pte;
+//   pagetable_t level_1_pt = (pagetable_t)PTE2PA((pte_t)(kernel_pt[0]));
+
+//   for (int i = 0; i < 512; i++) {
+//     pte = level_1_pt[i];
+//     if (pte & PTE_V) {
+//       uint64 phy_page = PTE2PA(pte);
+//       kfree((void*)phy_page);
+//       level_1_pt[i] = 0;
+//     }
+//   }
+
+//   kfree((void *)level_1_pt);  // 中间(第1级)页表
+//   kfree((void *)kernel_pt);   // 整个user kernel page table
+// }
 
 // free a proc structure and the data hanging from it,
 // including user pages.
@@ -150,8 +181,12 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  // if (p->kernel_pt) {
+  //   proc_free_user_kernel_pagetable(p->kernel_pt);
+  // }
 }
 
+// proc_pagetable分配一个没有使用的页表
 // Create a user page table for a given process,
 // with no user memory, but with trampoline pages.
 pagetable_t
@@ -213,22 +248,23 @@ userinit(void)
 {
   struct proc *p;
 
-  p = allocproc();
+  p = allocproc();      // xv6的第一个进程，其pid = 1
   initproc = p;
   
   // allocate one user page and copy init's instructions
   // and data into it.
-  uvminit(p->pagetable, initcode, sizeof(initcode));
+  // initcode是个全局变量字符数组
+  uvminit(p->pagetable, initcode, sizeof(initcode));      // 第一个进程的代码段就是proc.c下的initcode，将这段代码的虚实映射关系添加到用户进程页表中
   p->sz = PGSIZE;
 
   // prepare for the very first "return" from kernel to user.
-  p->trapframe->epc = 0;      // user program counter
+  p->trapframe->epc = 0;      // user program counter     // 设定用户进程的pc指针初始值为0，这就是sleep.c中断点被触发的原因
   p->trapframe->sp = PGSIZE;  // user stack pointer
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->state = RUNNABLE;
+  p->state = RUNNABLE;        // 该进程等待调度
 
   release(&p->lock);
 }
@@ -473,9 +509,16 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        // Starting excuting process's instructions
+        // w_satp(MAKE_SATP(p->kernel_pt));
+        // sfence_vma();   // 刷新当前CPU的TLB缓存
         swtch(&c->context, &p->context);
+        
+        // End of process -- Using global kernel pagetable after processing the process in the `kernel mode`
+        // w_satp(MAKE_SATP(kernel_pagetable));
+        // sfence_vma();   // 刷新当前CPU的TLB缓存
 
-        // Process is done running for now.
+        // Process is `done` running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
 
