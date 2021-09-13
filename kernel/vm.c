@@ -515,7 +515,7 @@ void uvmkpmap(pagetable_t kernel_pt, uint64 va, uint64 pa, uint64 sz, int perm)
 // (https://pdos.csail.mit.edu/6.828/2020/labs/pgtbl.html#:~:text=You%27ll%20need%20to%20modify%20xv6%20to%20prevent%20user%20processes%20from%20growing%20larger%20than%20the%20PLIC%20address )
 // Processes of kernel stacks, kernel self's data, kernel self's instruction and etc. are mapping by entry from entry 1 to entry 511(actually 255)
 pagetable_t proc_user_kernel_pagetable() {
-  pagetable_t kernel_pt = (pagetable_t) kalloc();
+  pagetable_t kernel_pt = uvmcreate();
   if (!kernel_pt) {
     return 0;
   }

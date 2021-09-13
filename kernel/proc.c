@@ -124,12 +124,12 @@ found:
   }
 
   // Alloc new kernel page table for each process own
-  // p->kernel_pt = proc_user_kernel_pagetable();
-  // if (!p->kernel_pt) {
-  //   freeproc(p);
-  //   release(&p->lock);
-  //   return 0;
-  // }
+  p->kernel_pt = proc_user_kernel_pagetable();
+  if (!p->kernel_pt) {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
@@ -143,23 +143,23 @@ found:
 // Only allocation realted to entry 0 at level 0 in user kernel page is exclusive to each process
 // 每个进程的内核页表的第0级的第0个entry下申请的页都是每个进程不一样的，不共享的，而其他的PTE内容都是共享global kernel_pagetable的
 // Thus, kfree the user kernel pagetable and allocation related to entry 0 at level 0
-// static void proc_free_user_kernel_pagetable(pagetable_t kernel_pt) {
-//   // Only kfree entry 0 at level 0 user kernel pagetable
-//   pte_t pte;
-//   pagetable_t level_1_pt = (pagetable_t)PTE2PA((pte_t)(kernel_pt[0]));
+static void proc_free_user_kernel_pagetable(pagetable_t kernel_pt) {
+  // Only kfree entry 0 at level 0 user kernel pagetable
+  pte_t pte;
+  pagetable_t level_1_pt = (pagetable_t)PTE2PA((pte_t)(kernel_pt[0]));
 
-//   for (int i = 0; i < 512; i++) {
-//     pte = level_1_pt[i];
-//     if (pte & PTE_V) {
-//       uint64 phy_page = PTE2PA(pte);
-//       kfree((void*)phy_page);
-//       level_1_pt[i] = 0;
-//     }
-//   }
+  for (int i = 0; i < 512; i++) {
+    pte = level_1_pt[i];
+    if (pte & PTE_V) {
+      uint64 phy_page = PTE2PA(pte);
+      kfree((void*)phy_page);
+      level_1_pt[i] = 0;
+    }
+  }
 
-//   kfree((void *)level_1_pt);  // 中间(第1级)页表
-//   kfree((void *)kernel_pt);   // 整个user kernel page table
-// }
+  kfree((void *)level_1_pt);  // 中间(第1级)页表
+  kfree((void *)kernel_pt);   // 整个user kernel page table
+}
 
 // free a proc structure and the data hanging from it,
 // including user pages.
@@ -181,9 +181,9 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
-  // if (p->kernel_pt) {
-  //   proc_free_user_kernel_pagetable(p->kernel_pt);
-  // }
+  if (p->kernel_pt) {
+    proc_free_user_kernel_pagetable(p->kernel_pt);
+  }
 }
 
 // proc_pagetable分配一个没有使用的页表
@@ -510,13 +510,13 @@ scheduler(void)
         p->state = RUNNING;
         c->proc = p;
         // Starting excuting process's instructions
-        // w_satp(MAKE_SATP(p->kernel_pt));
-        // sfence_vma();   // 刷新当前CPU的TLB缓存
+        w_satp(MAKE_SATP(p->kernel_pt));
+        sfence_vma();   // 刷新当前CPU的TLB缓存
         swtch(&c->context, &p->context);
         
         // End of process -- Using global kernel pagetable after processing the process in the `kernel mode`
-        // w_satp(MAKE_SATP(kernel_pagetable));
-        // sfence_vma();   // 刷新当前CPU的TLB缓存
+        w_satp(MAKE_SATP(kernel_pagetable));
+        sfence_vma();   // 刷新当前CPU的TLB缓存
 
         // Process is `done` running for now.
         // It should have changed its p->state before coming back.
