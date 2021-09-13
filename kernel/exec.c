@@ -122,6 +122,9 @@ exec(char *path, char **argv)
     vmprint(p->pagetable, 0);
   }
   // printf("===%s\n", p->name);
+
+  uvmCopyUserPt2UkernelPt(p->pagetable, p->kernel_pt, 0, p->sz);    // 对已有进程切换建立新映像的用户内核页表
+
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:

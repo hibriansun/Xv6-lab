@@ -266,11 +266,14 @@ userinit(void)
 
   p->state = RUNNABLE;        // 该进程等待调度
 
+  uvmCopyUserPt2UkernelPt(p->pagetable, p->kernel_pt, 0, p->sz);   // 对已有进程切换建立新映像的用户内核页表
+
   release(&p->lock);
 }
 
 // Grow or shrink user memory by n bytes.
 // Return 0 on success, -1 on failure.
+// 在sbrk前进程大小就是sz，因此增长/减小就是从sz来
 int
 growproc(int n)
 {
@@ -279,12 +282,16 @@ growproc(int n)
 
   sz = p->sz;
   if(n > 0){
+    if (PGROUNDUP(sz + n) >= PLIC) {
+      return -1;
+    }
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
+  uvmCopyUserPt2UkernelPt(p->pagetable, p->kernel_pt, p->sz, sz);   // p->sz还没更新 是旧地址空间范围边界 sz是sbrk后新返回来的地址空间边界
   p->sz = sz;
   return 0;
 }
@@ -330,6 +337,8 @@ fork(void)
   pid = np->pid;
 
   np->state = RUNNABLE;
+
+  uvmCopyUserPt2UkernelPt(np->pagetable, np->kernel_pt, 0, np->sz);
 
   release(&np->lock);
 

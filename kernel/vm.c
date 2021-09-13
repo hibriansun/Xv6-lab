@@ -5,8 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
-// #include "spinlock.h"
-// #include "proc.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -417,6 +417,12 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   return 0;
 }
 
+int
+copyin_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len);
+
+int
+copyinstr_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max);
+
 // Copy from user to kernel.
 // Copy len bytes to dst from virtual address srcva in a given page table.
 // Return 0 on success, -1 on error.
@@ -424,23 +430,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
-  uint64 n, va0, pa0;
-
-  while(len > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > len)
-      n = len;
-    memmove(dst, (void *)(pa0 + (srcva - va0)), n);
-
-    len -= n;
-    dst += n;
-    srcva = va0 + PGSIZE;
-  }
-  return 0;
+  return copyin_new(pagetable, dst, srcva, len);
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -450,40 +440,7 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 int
 copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
-  uint64 n, va0, pa0;
-  int got_null = 0;
-
-  while(got_null == 0 && max > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0); // 模拟分页硬件的操作，以确定srcva的物理地址pa0。检查用户提供的虚拟地址是否是进程用户地址空间的一部分，所以程序不能欺骗内核读取其他内存
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > max)
-      n = max;
-
-    char *p = (char *) (pa0 + (srcva - va0));
-    while(n > 0){
-      if(*p == '\0'){
-        *dst = '\0';
-        got_null = 1;
-        break;
-      } else {
-        *dst = *p;
-      }
-      --n;
-      --max;
-      p++;
-      dst++;
-    }
-
-    srcva = va0 + PGSIZE;
-  }
-  if(got_null){
-    return 0;
-  } else {
-    return -1;
-  }
+  return copyinstr_new(pagetable, dst, srcva, max);
 }
 
 void vmprint(pagetable_t pt, int level) {
@@ -538,4 +495,20 @@ pagetable_t proc_user_kernel_pagetable() {
 
 
   return kernel_pt;
+}
+
+// For fork(), exec(), and sbrk() process space building
+// Allocate new pages from oldsz(address) to newsz(address) because of user process memory start at 0x0
+void uvmCopyUserPt2UkernelPt(pagetable_t userPt, pagetable_t ukPt, uint64 oldsz, uint newsz) {
+  if (newsz >= PLIC) {
+    panic("uvmCopyUserPt2UkernelPt: User process overflowed");
+  }
+
+  for (uint64 va = oldsz; va < newsz; va += PGSIZE) {
+    pte_t* uPTE  = walk(userPt, va, 0);
+    pte_t* ukPTE = walk(ukPt, va, 1);
+
+    *ukPTE  = *uPTE;
+    *ukPTE &= ~(PTE_U|PTE_W|PTE_X);   // 取消不必要权限，这里只需要R，防止用户态内存破坏内核
+  }
 }
