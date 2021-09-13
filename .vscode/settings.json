@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "elf.h": "c",
+        "defs.h": "c",
+        "*.tcc": "cpp",
+        "vector": "cpp",
+        "cmath": "cpp"
+    }
+}
