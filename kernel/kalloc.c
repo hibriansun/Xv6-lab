@@ -45,7 +45,7 @@ freerange(void *pa_start, void *pa_end)
 // which normally should have been returned by a
 // call to kalloc().  (The exception is when
 // initializing the allocator; see kinit above.)
-// 操作单位：A page  合法操作范围：end of kernel text&data ~ PHYSTOPs
+// 操作单位：A page  合法操作范围：end of kernel text&data ~ PHYSTOPs (`Free` memory part)
 void
 kfree(void *pa)
 {

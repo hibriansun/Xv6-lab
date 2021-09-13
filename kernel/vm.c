@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+// #include "spinlock.h"
+// #include "proc.h"
 
 /*
  * the kernel's page table.
@@ -297,16 +299,23 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   return newsz;
 }
 
+// int gl = 0;    // Debug
+
 // Recursively free page-table pages.
 // All leaf mappings must already have been removed.
-// TODO
+// 遍历三级页表每级(一级页表至少一页，一页512个PTE)所有PTE，只要有PTE可以往下延伸，就继续递归
+// 遍历完某页后再free掉
 void
 freewalk(pagetable_t pagetable)
 {
+  // printf("START============================================================%d\n", gl);
+  // gl++;
+  
   // there are 2^9 = 512 PTEs in a page table.
   for(int i = 0; i < 512; i++){
     pte_t pte = pagetable[i];
     if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+      // printf("%p\n", PTE2PA(pte));
       // this PTE points to a lower-level page table.
       uint64 child = PTE2PA(pte);
       freewalk((pagetable_t)child);
@@ -316,6 +325,9 @@ freewalk(pagetable_t pagetable)
     }
   }
   kfree((void*)pagetable);
+
+  // gl--;
+  // printf("END============================================================%d\n", gl);
 }
 
 // Free user memory pages,
@@ -472,4 +484,58 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+void vmprint(pagetable_t pt, int level) {
+  // A pagetable page contains 512 PTEs
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pt[i];
+    if (pte & PTE_V) {
+      for (int j = level; j > 0; j--) {
+        printf(".. ");
+      }
+      printf("..");
+      printf("%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+
+      uint64 child = PTE2PA(pte);
+      if ((pte & (PTE_R | PTE_W | PTE_X)) == 0)   // (PTE_R | PTE_W | PTE_X)一旦被有一种被设置，那么说明这个PTE下面一定没有下一个页表页
+        vmprint((pagetable_t)child, level + 1);
+    }
+  }
+}
+
+void uvmkpmap(pagetable_t kernel_pt, uint64 va, uint64 pa, uint64 sz, int perm)
+{
+  if(mappages(kernel_pt, va, sz, pa, perm) != 0)
+    panic("uvmkpmap");
+}
+
+// For simplicity, we just copy all PTEs from global kernel_pagetable except entry 0 in the 0th level of global kernel_pagetable
+// (Because the entry 0 has ability to represent 1*(2^9)*(2^9)*4KB = 1GB physical pages. That enough to build mapping for user process memory limit.
+// (https://pdos.csail.mit.edu/6.828/2020/labs/pgtbl.html#:~:text=You%27ll%20need%20to%20modify%20xv6%20to%20prevent%20user%20processes%20from%20growing%20larger%20than%20the%20PLIC%20address )
+// Processes of kernel stacks, kernel self's data, kernel self's instruction and etc. are mapping by entry from entry 1 to entry 511(actually 255)
+pagetable_t proc_user_kernel_pagetable() {
+  pagetable_t kernel_pt = uvmcreate();
+  if (!kernel_pt) {
+    return 0;
+  }
+
+  // Unnecessary actually
+    for (int i = 1; i < 512; i++) {
+    kernel_pt[i] = kernel_pagetable[i];
+  }
+
+  // uart registers
+  uvmkpmap(kernel_pt, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+
+  // virtio mmio disk interface
+  uvmkpmap(kernel_pt, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+
+  // CLINT
+  uvmkpmap(kernel_pt, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+
+  uvmkpmap(kernel_pt, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+
+
+  return kernel_pt;
 }
