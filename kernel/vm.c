@@ -88,6 +88,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
   if(va >= MAXVA)
     panic("walk");
 
+  // 循环两次 -- 解析第0、第1级
   for(int level = 2; level > 0; level--) {
     pte_t *pte = &pagetable[PX(level, va)];     // 9位bit是page的索引，负责定位出在这级pagetable的page中的PTE
     if(*pte & PTE_V) {                          // PTE是否存在：如果没有设置，对该页的引用会引起异常
@@ -99,6 +100,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
       *pte = PA2PTE(pagetable) | PTE_V;
     }
   }
+  // 解析第2级页表
   return &pagetable[PX(0, va)];
 }
 
@@ -499,6 +501,7 @@ pagetable_t proc_user_kernel_pagetable() {
 
 // For fork(), exec(), and sbrk() process space building
 // Allocate new pages from oldsz(address) to newsz(address) because of user process memory start at 0x0
+// 从提供的user pagetable和kernel user pagetable中在两页表找到va对应的最后级页表PTE，复制用户页表的该PTE值到用户内核页表最后级页表PTE
 void uvmCopyUserPt2UkernelPt(pagetable_t userPt, pagetable_t ukPt, uint64 oldsz, uint newsz) {
   if (newsz >= PLIC) {
     panic("uvmCopyUserPt2UkernelPt: User process overflowed");
