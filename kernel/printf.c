@@ -121,6 +121,7 @@ panic(char *s)
   printf("panic: ");
   printf(s);
   printf("\n");
+  backtrace();
   panicked = 1; // freeze uart output from other CPUs
   for(;;)
     ;
@@ -131,4 +132,20 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+// 一个stack由多个stack frame组成，stack frame由函数调用自动产生
+// 每个stack frame由Return Addr, PrevFP, Saved Register, Local Var, ...组成，每个stack frame不一定相同由于组成部分大小相异
+// 但每个stack一定相同 大小为PGSIZE
+void backtrace(void)
+{
+  uint64 currFP = r_fp();
+  uint64 bottom = PGROUNDUP(currFP);    // Stack bottom is located at the highest address of stack
+
+  printf("backtrace:\n");
+  while(currFP < bottom) {
+    uint64 ra = *(uint64*)(currFP-8);
+    printf("%p\n", ra);
+    currFP = *(uint64*)(currFP-16);
+  }
 }
