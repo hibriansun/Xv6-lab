@@ -48,9 +48,11 @@ usertrap(void)
   struct proc *p = myproc();
   
   // save user program counter.
+  // 这trap开始时的硬件行为会将sepc设置成用户态程序PC
   p->trapframe->epc = r_sepc();
   
-  if(r_scause() == 8){
+  // 判断Trap类型并做出相应处理
+  if(r_scause() == 8){    // 系统调用
     // system call
 
     if(p->killed)
@@ -62,12 +64,14 @@ usertrap(void)
 
     // an interrupt will change sstatus &c registers,
     // so don't enable until done with those registers.
+    // 发生Trap时，RISCV会主动关闭中断，因为从发生中断到设置stvec为kernelvec这段时期，一旦发生中断处理中断的不是kernelvec，到这里设置完了也就可以打开中断了
+    // (from xv6-book the last paragraph of 4.5)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  } else if((which_dev = devintr()) != 0){    // 中断
     // ok
-  } else {
+  } else {    // 异常
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
@@ -97,6 +101,7 @@ usertrapret(void)
   intr_off();
 
   // send syscalls, interrupts, and exceptions to trampoline.S
+  // 设置stvec寄存器为下次trap做准备
   w_stvec(TRAMPOLINE + (uservec - trampoline));
 
   // set up trapframe values that uservec will need when
@@ -124,11 +129,14 @@ usertrapret(void)
   // jump to trampoline.S at the top of memory, which 
   // switches to the user page table, restores user registers,
   // and switches to user mode with sret.
-  uint64 fn = TRAMPOLINE + (userret - trampoline);
-  ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
+  // 最终返回用户态时要将sscratch设置为trapframe地址，在下次切换到内核态时内核使用该地址存储用户寄存器到trapframe
+  // 这里计算出trapframe地址保存到a0，在返回时a0与sscratch会交换
+  uint64 fn = TRAMPOLINE + (userret - trampoline);    // 计算出userret的地址，然后传参解引用函数指针
+  ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);     // 调用fn函数，传入函数第一个参数会存在a0，因此这样做达到了a0存储TRAPFRAME的目的
+  // 跳转至trampoline.S中的userret
 }
 
-// interrupts and exceptions from kernel code go here via kernelvec,
+// Two traps: `interrupts` and `exceptions` from kernel code go here via kernelvec,
 // on whatever the current kernel stack is.
 void 
 kerneltrap()
@@ -143,13 +151,14 @@ kerneltrap()
   if(intr_get() != 0)
     panic("kerneltrap: interrupts enabled");
 
+  // recognize and handle interrupt or exception returns 0 leading to panic in kernel
   if((which_dev = devintr()) == 0){
     printf("scause %p\n", scause);
     printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
     panic("kerneltrap");
   }
 
-  // give up the CPU if this is a timer interrupt.
+  // give up the CPU if this is a `timer interrupt`.
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
     yield();
 

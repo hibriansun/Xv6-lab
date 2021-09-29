@@ -160,6 +160,7 @@ w_mideleg(uint64 x)
 
 // Supervisor Trap-Vector Base Address
 // low two bits are mode.
+// 设置stevc值。stvec的值只可能是uservec或者kernelvec
 static inline void 
 w_stvec(uint64 x)
 {
@@ -216,6 +217,7 @@ w_mscratch(uint64 x)
 }
 
 // Supervisor Trap Cause
+// 从scause寄存器中获取Trap原因
 static inline uint64
 r_scause()
 {

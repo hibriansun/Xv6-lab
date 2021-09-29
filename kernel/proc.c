@@ -64,6 +64,7 @@ mycpu(void) {
 }
 
 // Return the current struct proc *, or zero if none.
+// 获取当前运行进程PCB
 struct proc*
 myproc(void) {
   push_off();

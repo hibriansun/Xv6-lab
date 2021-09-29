@@ -24,8 +24,9 @@ uservec:
         # mapped into user space, at TRAPFRAME.
         #
         
+        # sscratch is TRAPFRAME when a process is allocate
 	# swap a0 and sscratch
-        # so that a0 is TRAPFRAME
+        # so that `a0 is TRAPFRAME`
         csrrw a0, sscratch, a0
 
         # save the user registers in TRAPFRAME
@@ -60,11 +61,15 @@ uservec:
         sd t5, 272(a0)
         sd t6, 280(a0)
 
+        # sscratch is user a0 because of swapping at the beginning of uservec
 	# save the user a0 in p->trapframe->a0
         csrr t0, sscratch
         sd t0, 112(a0)
 
+        ################### END OF STORING USER REGISTERS IN TRAPFRAME ####################
+
         # restore kernel stack pointer from p->trapframe->kernel_sp
+        # p->trapframe->kernel_sp是在由kernel进入用户空间的时候设置好的
         ld sp, 8(a0)
 
         # make tp hold the current hartid, from p->trapframe->kernel_hartid
@@ -86,7 +91,7 @@ uservec:
 
 .globl userret
 userret:
-        # userret(TRAPFRAME, pagetable)
+        # userret(TRAPFRAME, pagetable)         函数名(参数1, 参数2)
         # switch from kernel to user.
         # usertrapret() calls here.
         # a0: TRAPFRAME, in user page table.
@@ -98,8 +103,10 @@ userret:
 
         # put the saved user a0 in sscratch, so we
         # can swap it with our a0 (TRAPFRAME) in the last step.
+        # a0的值是trapframe，但是我们这里是将trapfram中的a0还原给sscratch，trapframe中的a0是用户态sscratch内容：系统调用返回值 （/* 112 */ uint64 a0; ）
         ld t0, 112(a0)
         csrw sscratch, t0
+        # 在这里print/x $sscratch应该是0x2
 
         # restore all but a0 from TRAPFRAME
         ld ra, 40(a0)
@@ -133,9 +140,14 @@ userret:
         ld t5, 272(a0)
         ld t6, 280(a0)
 
+        # 到这里除了a0所有的用户寄存器都恢复完了
+        # a0是trapframe地址，sscratch是上文中trapfram->a0的值，也就是系统调用返回值
+
 	# restore user a0, and save TRAPFRAME in sscratch
         csrrw a0, sscratch, a0
         
         # return to user mode and user pc.
         # usertrapret() set up sstatus and sepc.
+        # 将PC设置成sepc，sepc在usertrapret中被设置成p->trampoline->epc，这个又在usertrap被保存
+        # 由于在usertrapret中的设置，sret还会打开中断和切换成user mode
         sret

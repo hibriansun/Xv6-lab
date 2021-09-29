@@ -4,6 +4,7 @@
 #include "syscall.h"
 
 # exec(init, argv)
+# 用户态调用exec
 .globl start
 start:
         la a0, init
