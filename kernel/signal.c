@@ -26,6 +26,7 @@ uint64 sys_sigreturn(void) {
     struct proc* p = myproc();
 
     p->tickPassed = 0;
-
+    *p->trapframe = p->trapframeBackup;
+    
     return 0;
 }

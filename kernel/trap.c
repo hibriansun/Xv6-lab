@@ -85,9 +85,12 @@ usertrap(void)
     // 进来一次说明来一次时钟中断，每个tick又会发生一个时钟中断(Every tick, the hardware clock forces an interrupt, which is handled in usertrap() in kernel/trap.c.)
     // printf("timer interrupt\n");
     p->tickPassed++;
+    // save the user register back to a new user addr after userret
     if (p->tickPassed == p->interval) {
+      p->trapframeBackup = *(p->trapframe);
       p->trapframe->epc = (uint64)p->handler;
     }
+    // backtrace();
     yield();
   }
 

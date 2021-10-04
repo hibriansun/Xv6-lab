@@ -106,4 +106,6 @@ struct proc {
   int interval;
   void (*handler)();
   int tickPassed;
+
+  struct trapframe trapframeBackup;
 };
