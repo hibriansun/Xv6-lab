@@ -81,8 +81,15 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if (which_dev == 2) {
+    // 进来一次说明来一次时钟中断，每个tick又会发生一个时钟中断(Every tick, the hardware clock forces an interrupt, which is handled in usertrap() in kernel/trap.c.)
+    // printf("timer interrupt\n");
+    p->tickPassed++;
+    if (p->tickPassed == p->interval) {
+      p->trapframe->epc = (uint64)p->handler;
+    }
     yield();
+  }
 
   usertrapret();
 }

@@ -148,6 +148,8 @@ userret:
         
         # return to user mode and user pc.
         # usertrapret() set up sstatus and sepc.
-        # 将PC设置成sepc，sepc在usertrapret中被设置成p->trampoline->epc，这个又在usertrap被保存
+        
+        # sret:
+        # 将PC设置成sepc。sepc在usertrapret中被设置成p->trampoline->epc，用户PC又在usertrap被保存到p->trampoline->epc
         # 由于在usertrapret中的设置，sret还会打开中断和切换成user mode
         sret

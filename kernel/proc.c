@@ -128,6 +128,9 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // Initialize proc field
+  p->tickPassed = 0;
+
   return p;
 }
 
