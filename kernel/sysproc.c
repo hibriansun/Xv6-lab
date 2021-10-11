@@ -38,6 +38,9 @@ sys_wait(void)
   return wait(p);
 }
 
+// Xv6 applications ask the kernel for `heap` memory using the sbrk() system call.
+// Lazy allocation only increases `p->sz` in sys_sbrk().
+// The process uses unallocate memory virtual address leading to page fault after sbrk.
 uint64
 sys_sbrk(void)
 {
@@ -47,8 +50,9 @@ sys_sbrk(void)
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
+  myproc()->sz += n;
+  // if(growproc(n) < 0)
+  //   return -1;
   return addr;
 }
 

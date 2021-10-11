@@ -181,9 +181,11 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+      continue;
+      // panic("uvmunmap: walk");
     if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+      continue;
+    //   panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
@@ -249,6 +251,24 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     }
   }
   return newsz;
+}
+
+void vmprint(pagetable_t pt, int level) {
+  // A pagetable page contains 512 PTEs
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pt[i];
+    if (pte & PTE_V) {
+      for (int j = level; j > 0; j--) {
+        printf(".. ");
+      }
+      printf("..");
+      printf("%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+
+      uint64 child = PTE2PA(pte);
+      if ((pte & (PTE_R | PTE_W | PTE_X)) == 0)   // (PTE_R | PTE_W | PTE_X)一旦被有一种被设置，那么说明这个PTE下面一定没有下一个页表页
+        vmprint((pagetable_t)child, level + 1);
+    }
+  }
 }
 
 // Deallocate user pages to bring the process size from oldsz to

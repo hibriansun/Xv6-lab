@@ -67,6 +67,31 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if (r_scause() == 13 || r_scause() == 15) {    // Page faluts
+    // printf("== %p ==\n", r_sepc());
+    // vmprint(p->pagetable, 0);
+
+    // Create PTEs and allocate a new page for lazy allocation.
+    uint64 oldsz = PGROUNDDOWN(r_stval());
+    uint64 mem = (uint64)kalloc();
+    if(mem == 0){
+      uvmdealloc(p->pagetable, oldsz, r_stval());
+      panic("page faults handler falut");
+    }
+    memset((void*)mem, 0, PGSIZE);
+    if(mappages(p->pagetable, oldsz, PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_U) != 0){
+      kfree((void*)mem);
+      uvmdealloc(p->pagetable, oldsz, r_stval());
+      panic("page faults handler falut");
+    }
+
+    // That's fine
+    // if(uvmalloc(p->pagetable, PGROUNDDOWN(r_stval()), PGROUNDDOWN(r_stval())+PGSIZE) == 0) {
+    //   panic("xdd");
+    // }
+
+    // printf("=================================\n");
+    // vmprint(p->pagetable, 0);
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
