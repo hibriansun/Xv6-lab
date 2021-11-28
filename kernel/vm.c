@@ -255,7 +255,7 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 
 // Allocate PTEs and physical memory to grow process from oldsz to
 // newsz, which need `not` be page aligned.  Returns new size or 0 on error.
-// 实现扩容 -- 地址边界是从oldsz到newsz，原因是uvm(用户空间的虚拟内存都是从0开始分配的)，在这里范围从0~oldsz变为0~newsz，这两个范围有重叠部分
+// 实现扩容 -- 用户虚拟地址空间动态内存分配，heap增长是从低地址向高地址增长
 uint64
 uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
