@@ -53,8 +53,10 @@
 
 // map kernel stacks beneath the trampoline,
 // each surrounded by invalid guard pages.
+/// Kernel虚拟地址空间PHYSTOP~MAXVA中内核栈部分
 #define KSTACK(p) (TRAMPOLINE - ((p)+1)* 2*PGSIZE)
 
+/// 用户虚拟内存布局
 // User memory layout.
 // Address zero first:
 //   text

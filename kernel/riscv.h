@@ -188,6 +188,7 @@ w_mtvec(uint64 x)
 
 // supervisor address translation and protection;
 // holds the address of the page table.
+/// satp: 根页表地址寄存器
 static inline void 
 w_satp(uint64 x)
 {
@@ -320,29 +321,33 @@ sfence_vma()
 }
 
 
-#define PGSIZE 4096 // bytes per page
-#define PGSHIFT 12  // bits of offset within a page
+#define PGSIZE 4096 // bytes per page 一个内存页的大小
+#define PGSHIFT 12  // bits of offset within a page 一个内存页的页内偏移 用于物理地址低12位(2^12 = 4096)
 
-#define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))
+#define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))  // 取整
 #define PGROUNDDOWN(a) (((a)) & ~(PGSIZE-1))
 
-#define PTE_V (1L << 0) // valid
+#define PTE_V (1L << 0) // valid      // PTE低10位作为flag位
 #define PTE_R (1L << 1)
 #define PTE_W (1L << 2)
 #define PTE_X (1L << 3)
 #define PTE_U (1L << 4) // 1 -> user can access
 
 // shift a physical address to the right place for a PTE.
-#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
+#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)     // 某个物理页中所有地址的12~55位都是一样的 0~11位不一样 是各自在页中的offset
+                                                    // 对某物理地址右移12位再左移10位形成的是 代表原本页的 PTE, PTE第10位为它的flags位
 
-#define PTE2PA(pte) (((pte) >> 10) << 12)
+#define PTE2PA(pte) (((pte) >> 10) << 12)           // 删除PTE的flags位，恢复成该PTE所代表 原本物理页的起始物理地址
+                                                    // 低12位为页中offset,全为0则说明是某页起点
 
-#define PTE_FLAGS(pte) ((pte) & 0x3FF)
+#define PTE_FLAGS(pte) ((pte) & 0x3FF)              // 0x3FF = 11 1111 1111
+                                                    // 获取PTE中被标记的flags
 
 // extract the three 9-bit page table indices from a virtual address.
-#define PXMASK          0x1FF // 9 bits
+// 虚拟地址中三级页表对应每级页表页的页号都是9位, 第12位为页内偏移offset，与物理地址第12位一致
+#define PXMASK          0x1FF                       // 9 bits   0x1FF = 1 1111 1111
 #define PXSHIFT(level)  (PGSHIFT+(9*(level)))
-#define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
+#define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)  // 从虚拟地址中获取第level级页表页中某个PTE的索引(页内偏移量) 
 
 // one beyond the highest possible virtual address.
 // MAXVA is actually one bit less than the max allowed by
@@ -351,4 +356,4 @@ sfence_vma()
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
 
 typedef uint64 pte_t;
-typedef uint64 *pagetable_t; // 512 PTEs
+typedef uint64 *pagetable_t; // 512 PTEs    // 页表中某层的某个页，一个数组，内含512个PTE，514*4 = 4096bytes

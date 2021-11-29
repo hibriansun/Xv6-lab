@@ -46,13 +46,21 @@ sys_sbrk(void)
 {
   int addr;
   int n;
+  struct proc* p = myproc();
 
   if(argint(0, &n) < 0)
     return -1;
-  addr = myproc()->sz;
-  myproc()->sz += n;
-  // if(growproc(n) < 0)
-  //   return -1;
+
+  addr = p->sz;
+
+  // deallocation
+  if (n < 0) {
+    // We should negative sbrk() arguments.
+    p->sz = uvmdealloc(p->pagetable, PGROUNDDOWN(p->sz), PGROUNDDOWN(p->sz) + n);        // BUG still?
+  } else if (n > 0) {
+    p->sz += n;
+  }
+  
   return addr;
 }
 
