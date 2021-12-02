@@ -70,6 +70,11 @@ kvminithart()
 //   21..29 -- 9 bits of level-1 index.
 //   12..20 -- 9 bits of level-0 index.
 //    0..11 -- 12 bits of byte offset within the page.
+// 功能：返回包含虚拟地址对应物理地址所在物理页起始地址信息的PTE的地址
+// 若alloc为1，那么当我们试图找一个不存在映射关系的虚拟地址时：
+// 在根页表找不到对应合法PTE，那么就Alloc一页作为下级页表页，并建立本级PTE对新建页的PTE关联
+// 下级页表页上操作类似，也是Alloc一页作为下级页表页，并建立本级PTE对新建页的PTE关联
+// 最终返回最后一级页表页上包含虚拟地址对应物理地址所在物理页信息的PTE地址，而不会对不存在目标物理页生成(注意walk中for终止条件为>0不是>=0)
 pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
@@ -82,7 +87,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     if(*pte & PTE_V) {    // PTE存的地址是指向下级页表的某页
       pagetable = (pagetable_t)PTE2PA(*pte);
     } else {              // PTE指向不存在页，即va定位的下级页表不存在
-      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
+      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)     // pagetable被更新为下级新生成的物理页地址
         return 0;
       memset(pagetable, 0, PGSIZE);
       *pte = PA2PTE(pagetable) | PTE_V;       // 为下级页表新建一页，将该页起始物理地址变化填充到本级PTE中
@@ -211,7 +216,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 
 // create an empty user page table.
 // returns 0 if out of memory.
-// 创建一个新用户页表，内含一页
+// 新建一个用户虚拟地址空间的页表，大小为一页(即根级页表大小)
 // fork/新exec
 // allocproc()/exec() -> proc_pagetable() -> uvmcreate()
 pagetable_t
@@ -325,8 +330,8 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 
 // Given a parent process's page table, copy
 // its memory into a child's page table.
-// Copies both the page table and the
-// physical memory.
+// """""Copies both the page table and the"""""
+// """""physical memory."""""
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
 // fork() -> uvmcopy()

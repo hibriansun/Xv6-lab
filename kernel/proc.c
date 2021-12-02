@@ -6,14 +6,14 @@
 #include "proc.h"
 #include "defs.h"
 
-struct cpu cpus[NCPU];
+struct cpu cpus[NCPU];      // 全局变量: CPUs的状态信息集合 (CPU Table)
 
-struct proc proc[NPROC];
+struct proc proc[NPROC];    // 全局变量: 进程Processes的状态信息集合 (Process Table)
 
 struct proc *initproc;
 
-int nextpid = 1;
-struct spinlock pid_lock;
+int nextpid = 1;            // 分配新进程pid所用
+struct spinlock pid_lock;   // 对pid进行锁保护
 
 extern void forkret(void);
 static void wakeup1(struct proc *chan);
@@ -114,6 +114,8 @@ found:
   }
 
   // An empty user page table.
+  // 建立Trapframe和trampoline页表映射 但没给两者自身分配物理页
+  // 但trapframe在上面已分配空间，且trampoline所有用户程序和内核都共享同一块物理内存
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
     freeproc(p);
@@ -124,8 +126,8 @@ found:
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
-  p->context.ra = (uint64)forkret;
-  p->context.sp = p->kstack + PGSIZE;
+  p->context.ra = (uint64)forkret;    // 返回地址
+  p->context.sp = p->kstack + PGSIZE; // TODO ??? 分配栈空间
 
   return p;
 }
@@ -153,14 +155,14 @@ freeproc(struct proc *p)
 }
 
 // Create a user page table for a given process,
-// with no user memory, but with trampoline pages.
+// with "no user memory", but with "trampoline pages and trapframe".
 pagetable_t
 proc_pagetable(struct proc *p)
 {
   pagetable_t pagetable;
 
   // An empty page table.
-  pagetable = uvmcreate();
+  pagetable = uvmcreate();  // 新建一个用户虚拟地址空间的页表，大小为一页(即根级页表大小)
   if(pagetable == 0)
     return 0;
 
@@ -260,7 +262,7 @@ fork(void)
 {
   int i, pid;
   struct proc *np;
-  struct proc *p = myproc();
+  struct proc *p = myproc();    // 获取当前进程PCB
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -268,14 +270,15 @@ fork(void)
   }
 
   // Copy user memory from parent to child.
+  // 拷贝both the page table and the physical memory.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;
   }
-  np->sz = p->sz;
+  np->sz = p->sz;             // 进程虚拟内存大小设置
 
-  np->parent = p;
+  np->parent = p;             // 建立父子进程关系
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);

@@ -1,7 +1,8 @@
 // Saved registers for kernel context switches.
 struct context {
-  uint64 ra;
-  uint64 sp;
+// Register description: https://i.loli.net/2021/11/30/z6ayWqQiVONeEkn.png
+  uint64 ra;    // return address
+  uint64 sp;    // stack pointer
 
   // callee-saved
   uint64 s0;
@@ -20,10 +21,10 @@ struct context {
 
 // Per-CPU state.
 struct cpu {
-  struct proc *proc;          // The process running on this cpu, or null.
-  struct context context;     // swtch() here to enter scheduler().
-  int noff;                   // Depth of push_off() nesting.
-  int intena;                 // Were interrupts enabled before push_off()?
+  struct proc *proc;          // The process running on this cpu, or null.  // 该CPU运行任务了吗，是运行哪个进程
+  struct context context;     // swtch() here to enter scheduler().         // TODO ??? 上下文
+  int noff;                   // Depth of push_off() nesting.               // TODO ???
+  int intena;                 // Were interrupts enabled before push_off()? // TODO ???
 };
 
 extern struct cpu cpus[NCPU];
