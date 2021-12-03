@@ -2226,11 +2226,13 @@ sbrkarg(char *s)
 
   a = sbrk(PGSIZE);
   fd = open("sbrk", O_CREATE|O_WRONLY);
-  unlink("sbrk");
+  unlink("sbrk");   // unlink()会删除参数pathname 指定的文件. 如果该文件名为最后连接点, 但有其他进程打开了此文件, 则在所有关于此文件的文件描述词皆关闭后才会删除. 如果参数pathname 为一符号连接, 则此连接会被删除。
   if(fd < 0)  {
     printf("%s: open sbrk failed\n", s);
     exit(1);
   }
+  // **read** the data from `a` to the kernel
+  // the kernel write the data to fd
   if ((n = write(fd, a, PGSIZE)) < 0) {
     printf("%s: write sbrk failed\n", s);
     exit(1);

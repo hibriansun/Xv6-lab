@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -101,10 +103,27 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
 
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
-    return 0;
-  if((*pte & PTE_V) == 0)
-    return 0;
+  if(pte == 0 || (*pte & PTE_V) == 0)  // Invaild address OR 合法虚拟地址空间地址但没被映射由于lazy allocation
+  {
+    if ((va >= myproc()->sz || va <= PGROUNDDOWN(myproc()->trapframe->sp))) {  // Invaild address
+      return 0;
+    }
+    
+    // 合法虚拟地址空间地址但没被映射由于lazy allocation
+    char* mem = (char*)kalloc();
+    if(mem == 0){
+      panic("Lazy allocation failed: out of memory");
+    }
+    memset((void*)mem, 0, PGSIZE);
+    // map
+    if(mappages(pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_U) != 0){
+      kfree((void*)mem);
+      uvmdealloc(pagetable, PGROUNDUP(va), PGROUNDDOWN(va));
+      panic("Lazy allocation failed");
+    }
+    pte = walk(pagetable, va, 0);
+  }
+  
   if((*pte & PTE_U) == 0)
     return 0;
   pa = PTE2PA(*pte);
@@ -183,7 +202,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if((pte = walk(pagetable, a, 0)) == 0)
       continue;
       // panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
+    if((*pte & PTE_V) == 0)     // not panic if some pages aren't mapped. (Lazy allocation)
       continue;
     //   panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
@@ -335,9 +354,11 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
+      continue;
+      // panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      continue;
+      // panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -384,6 +405,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
+
     memmove((void *)(pa0 + (dstva - va0)), src, n);
 
     len -= n;
@@ -403,12 +425,17 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);
+    // 可能PTE不存在 可能存在但指向物理页地址值为0即未allocate但有页表(由于页表页也是一页一页分配，这里的可能就是里面一些没用到的PTE)  ==>(使得pa0 = 0)
     pa0 = walkaddr(pagetable, va0);
+
+    // They will error out if physical address does not exist.(The valid but not mapped virtual address has been handled in walkaddr().)
     if(pa0 == 0)
       return -1;
+    
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;
+    
     memmove(dst, (void *)(pa0 + (srcva - va0)), n);
 
     len -= n;

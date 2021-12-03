@@ -67,16 +67,22 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else if (r_scause() == 13 || r_scause() == 15) {    // Page faluts
+  } else if (r_scause() == 13 || r_scause() == 15) {    // Page Fault Handler
     // printf("== %p ==\n", r_sepc());
     // vmprint(p->pagetable, 0);
+
+    if (r_stval() > p->sz || r_stval() < PGROUNDDOWN(p->trapframe->sp)) {
+      p->killed = 1;
+      goto kill;
+    }
 
     // Create PTEs and allocate a new page for lazy allocation.
     uint64 oldsz = PGROUNDDOWN(r_stval());
     uint64 mem = (uint64)kalloc();
     if(mem == 0){
       uvmdealloc(p->pagetable, oldsz, r_stval());
-      panic("page faults handler falut");
+      p->killed = 1;      // Out of Memory (没有物理内存可供分配了，这里还有更巧妙处理方法，例如clock、LRU算法来evict pages)
+      goto kill;
     }
     memset((void*)mem, 0, PGSIZE);
     if(mappages(p->pagetable, oldsz, PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_U) != 0){
@@ -98,6 +104,7 @@ usertrap(void)
     p->killed = 1;
   }
 
+kill:
   if(p->killed)
     exit(-1);
 
