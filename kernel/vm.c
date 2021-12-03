@@ -108,20 +108,7 @@ walkaddr(pagetable_t pagetable, uint64 va)
     if ((va >= myproc()->sz || va <= PGROUNDDOWN(myproc()->trapframe->sp))) {  // Invaild address
       return 0;
     }
-    
-    // 合法虚拟地址空间地址但没被映射由于lazy allocation
-    char* mem = (char*)kalloc();
-    if(mem == 0){
-      panic("Lazy allocation failed: out of memory");
-    }
-    memset((void*)mem, 0, PGSIZE);
-    // map
-    if(mappages(pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_U) != 0){
-      kfree((void*)mem);
-      uvmdealloc(pagetable, PGROUNDUP(va), PGROUNDDOWN(va));
-      panic("Lazy allocation failed");
-    }
-    pte = walk(pagetable, va, 0);
+    return -1;
   }
   
   if((*pte & PTE_U) == 0)
@@ -400,6 +387,21 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
+    if(pa0 == -1) {
+      // 合法虚拟地址空间地址但没被映射由于lazy allocation
+      char* mem = (char*)kalloc();
+      if(mem == 0){
+        panic("Lazy allocation failed: out of memory");
+      }
+      memset((void*)mem, 0, PGSIZE);
+      // map
+      if(mappages(pagetable, PGROUNDDOWN(va0), PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_U) != 0){
+        kfree((void*)mem);
+        uvmdealloc(pagetable, PGROUNDUP(va0), PGROUNDDOWN(va0));
+        panic("Lazy allocation failed");
+      }
+      pa0 = PTE2PA(*walk(pagetable, va0, 0));
+    }
     if(pa0 == 0)
       return -1;
     n = PGSIZE - (dstva - va0);
@@ -435,8 +437,8 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;
-    
-    memmove(dst, (void *)(pa0 + (srcva - va0)), n);
+    if(pa0 != -1)
+      memmove(dst, (void *)(pa0 + (srcva - va0)), n);
 
     len -= n;
     dst += n;
