@@ -23,19 +23,22 @@ acquire(struct spinlock *lk)
 {
   push_off(); // disable interrupts to avoid deadlock.
   if(holding(lk))
-    panic("acquire");
+    panic("acquire");       // 检测死锁
 
   // On RISC-V, sync_lock_test_and_set turns into an atomic swap:
   //   a5 = 1
   //   s1 = &lk->locked
   //   amoswap.w.aq a5, a5, (s1)
-  while(__sync_lock_test_and_set(&lk->locked, 1) != 0)
+  while(__sync_lock_test_and_set(&lk->locked, 1) != 0)      // 实现自旋 与 原子占用操作
     ;
 
   // Tell the C compiler and the processor to not move loads or stores
   // past this point, to ensure that the critical section's memory
   // references happen strictly after the lock is acquired.
   // On RISC-V, this emits a fence instruction.
+  // 禁止CPU和编译器在代码段使用锁时对指令流顺序进行re-order 可能导致锁窗口期的出现
+  // 这里使用内存屏障
+  // xv6中的屏障几乎在所有重要的情况下都会acquire和release强制顺序，因为xv6在访问共享数据的周围使用锁
   __sync_synchronize();
 
   // Record info about lock acquisition for holding() and debugging.
@@ -66,7 +69,7 @@ release(struct spinlock *lk)
   // On RISC-V, sync_lock_release turns into an atomic swap:
   //   s1 = &lk->locked
   //   amoswap.w zero, zero, (s1)
-  __sync_lock_release(&lk->locked);
+  __sync_lock_release(&lk->locked);     // C库提供的原子赋值
 
   pop_off();
 }
@@ -92,8 +95,8 @@ push_off(void)
 
   intr_off();
   if(mycpu()->noff == 0)
-    mycpu()->intena = old;
-  mycpu()->noff += 1;
+    mycpu()->intena = old;  // 记录本次关中断且中断计数前中断开启与否状态
+  mycpu()->noff += 1;       // 某个CPU核心上中断嵌套计数+1
 }
 
 void
@@ -104,7 +107,7 @@ pop_off(void)
     panic("pop_off - interruptible");
   if(c->noff < 1)
     panic("pop_off");
-  c->noff -= 1;
+  c->noff -= 1;           // 某个CPU核心上中断嵌套计数-1
   if(c->noff == 0 && c->intena)
-    intr_on();
+    intr_on();            // 某个CPU核心上中断嵌套计数等于0时开启中断
 }

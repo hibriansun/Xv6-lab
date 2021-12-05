@@ -9,7 +9,7 @@ static char digits[] = "0123456789ABCDEF";
 static void
 putc(int fd, char c)
 {
-  write(fd, &c, 1);
+  write(fd, &c, 1);     // 通过系统调用进入内核
 }
 
 static void

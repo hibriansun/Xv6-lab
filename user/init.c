@@ -11,15 +11,19 @@
 
 char *argv[] = { "sh", 0 };
 
+// 系统启动后运行的第一个'用户'进程
 int
 main(void)
 {
   int pid, wpid;
 
-  if(open("console", O_RDWR) < 0){
+  if(open("console", O_RDWR) < 0){    // 打开 控制台 的文件描述符
     mknod("console", CONSOLE, 0);
     open("console", O_RDWR);
   }
+  // 通过dup创建stdout和stderr。这里实际上通过复制文件描述符0，得到了另外两个文件描述符1，2。最终文件描述符0，1，2都用来代表Console
+  // dup() system call creates a copy of the file descriptor oldfd
+  // using the lowest-numbered unused file descriptor for the new descriptor.
   dup(0);  // stdout
   dup(0);  // stderr
 
@@ -31,7 +35,7 @@ main(void)
       exit(1);
     }
     if(pid == 0){
-      exec("sh", argv);
+      exec("sh", argv);   // sh.c中从main开始执行
       printf("init: exec sh failed\n");
       exit(1);
     }

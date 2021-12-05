@@ -23,8 +23,8 @@ struct context {
 struct cpu {
   struct proc *proc;          // The process running on this cpu, or null.  // 该CPU运行任务了吗，是运行哪个进程
   struct context context;     // swtch() here to enter scheduler().         // TODO ??? 上下文
-  int noff;                   // Depth of push_off() nesting.               // TODO ???
-  int intena;                 // Were interrupts enabled before push_off()? // TODO ???
+  int noff;                   // Depth of push_off() nesting.               // 某个CPU核心上中断嵌套计数
+  int intena;                 // Were interrupts enabled before push_off()? // 关闭中断前中断开启状态
 };
 
 extern struct cpu cpus[NCPU];

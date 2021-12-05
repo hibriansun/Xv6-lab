@@ -259,6 +259,8 @@ r_time()
 }
 
 // enable device interrupts
+// 设置SSTATUS寄存器，打开中断标志位
+// 使得CPU能接收中断
 static inline void
 intr_on()
 {
@@ -273,6 +275,7 @@ intr_off()
 }
 
 // are device interrupts enabled?
+// 获取中断开启与否状态
 static inline int
 intr_get()
 {

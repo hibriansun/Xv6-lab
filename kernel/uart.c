@@ -49,6 +49,7 @@ extern volatile int panicked; // from printf.c
 
 void uartstart();
 
+// 配置好UART芯片使其可以被使用
 void
 uartinit(void)
 {
@@ -58,7 +59,7 @@ uartinit(void)
   // special mode to set baud rate.
   WriteReg(LCR, LCR_BAUD_LATCH);
 
-  // LSB for baud rate of 38.4K.
+  // LSB for baud rate(串口线的传输速率) of 38.4K.
   WriteReg(0, 0x03);
 
   // MSB for baud rate of 38.4K.
@@ -134,6 +135,7 @@ uartputc_sync(int c)
 // in the transmit buffer, send it.
 // caller must hold uart_tx_lock.
 // called from both the top- and bottom-half.
+// 通知设备执行操作
 void
 uartstart()
 {
@@ -143,7 +145,7 @@ uartstart()
       return;
     }
     
-    if((ReadReg(LSR) & LSR_TX_IDLE) == 0){
+    if((ReadReg(LSR) & LSR_TX_IDLE) == 0){            // 检查当前设备是否空闲
       // the UART transmit holding register is full,
       // so we cannot give it another byte.
       // it will interrupt when it's ready for a new byte.
@@ -156,8 +158,9 @@ uartstart()
     // maybe uartputc() is waiting for space in the buffer.
     wakeup(&uart_tx_r);
     
-    WriteReg(THR, c);
+    WriteReg(THR, c);     // 将数据写入到THR（Transmission Holding Register）发送寄存器
   }
+  // 一旦数据送到了设备，系统调用会返回，用户应用程序Shell就可以继续执行
 }
 
 // read one input character from the UART.
@@ -176,6 +179,7 @@ uartgetc(void)
 // handle a uart interrupt, raised because input has
 // arrived, or the uart is ready for more output, or
 // both. called from trap.c.
+// UART Interrupt Handler
 void
 uartintr(void)
 {

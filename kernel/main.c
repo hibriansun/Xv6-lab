@@ -10,8 +10,8 @@ volatile static int started = 0;
 void
 main()
 {
-  if(cpuid() == 0){
-    consoleinit();
+  if(cpuid() == 0){  // 第一个核启动走这里
+    consoleinit();   // 初始化控制台设备能接收 设备(外部)中断、软件中断、定时器中断
     printfinit();
     printf("\n");
     printf("xv6 kernel is booting\n");
@@ -22,7 +22,7 @@ main()
     procinit();      // process table
     trapinit();      // trap vectors
     trapinithart();  // install kernel trap vector
-    plicinit();      // set up interrupt controller
+    plicinit();      // set up interrupt controller     // 设置PLIC 使得中断能被CPU感知
     plicinithart();  // ask PLIC for device interrupts
     binit();         // buffer cache
     iinit();         // inode cache
@@ -31,7 +31,7 @@ main()
     userinit();      // first user process
     __sync_synchronize();
     started = 1;
-  } else {
+  } else {           // 第2 3...核心走这里
     while(started == 0)
       ;
     __sync_synchronize();

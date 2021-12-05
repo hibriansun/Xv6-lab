@@ -141,6 +141,7 @@ getcmd(char *buf, int nbuf)
   return 0;
 }
 
+// 用户程序 shell
 int
 main(void)
 {
@@ -156,7 +157,7 @@ main(void)
   }
 
   // Read and run input commands.
-  while(getcmd(buf, sizeof(buf)) >= 0){
+  while(getcmd(buf, sizeof(buf)) >= 0){   // 输出$
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
       // Chdir must be called by the parent, not the child.
       buf[strlen(buf)-1] = 0;  // chop \n

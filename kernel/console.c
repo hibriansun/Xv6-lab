@@ -74,10 +74,11 @@ consolewrite(int user_src, uint64 src, int n)
 
 //
 // user read()s from the console go here.
-// copy (up to) a whole input line to dst.
-// user_dist indicates whether dst is a user
+// copy (up to) a whole input line `to dst`.
+// user_dst indicates whether dst is a user
 // or kernel address.
 //
+// 通过中断接收输入的到来
 int
 consoleread(int user_dst, uint64 dst, int n)
 {
@@ -185,7 +186,7 @@ consoleinit(void)
 {
   initlock(&cons.lock, "cons");
 
-  uartinit();
+  uartinit();   // 配置好UART芯片使其可以被使用
 
   // connect read and write system calls
   // to consoleread and consolewrite.
