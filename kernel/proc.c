@@ -114,8 +114,8 @@ found:
   }
 
   // An empty user page table.
-  // 建立Trapframe和trampoline页表映射 但没给两者自身分配物理页
-  // 但trapframe在上面已分配空间，且trampoline所有用户程序和内核都共享同一块物理内存
+  // 建立Trapframe和trampoline页表映射
+  // trapframe在上面已分配空间，且trampoline所有用户程序和内核都共享同一块物理内存
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
     freeproc(p);
