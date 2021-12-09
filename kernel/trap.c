@@ -68,40 +68,32 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else if (r_scause() == 13 || r_scause() == 15){
+    // 这里是处理所有无法由虚拟地址翻译成物理地址的地方，处理不当就会cause some problems(usertest)
+    // load操作数无法被翻译
+    // store操作数无法被翻译
+    // 指令本身的地址无法被翻译成物理地址
+
+    // pte = 0 ==> 虚拟地址没有对应的物理地址
+    // 物理地址不可写 pte的PTE_W位为0
+    // cow共享页不可写 pte的PTE_COW位为1
+    // 虚拟地址值不合法(va > MAXVA || (va <= PGROUNDDOWN(p->trapframe->sp) && va >= PGROUNDDOWN(p->trapframe->sp)-PGSIZE))
+    // 具体handler中错误(例如cow中无法再kalloc了(OOM))
+    // ...
+    // 这些情况都需要将程序kill掉
     uint64 va = r_stval();
     if(va > MAXVA || (va <= PGROUNDDOWN(p->trapframe->sp) && va >= PGROUNDDOWN(p->trapframe->sp)-PGSIZE)){
       p->killed = 1;
     }
     
-    if(checkCOW(p->pagetable, va) == 0){
-      printf("Not cow page fault but may be not handled\n");
+    if(checkCOW(p->pagetable, va) != 0){
+      if(cowhandler(p->pagetable, va) != 0){
+        p->killed = 1;
+      }
+    }else{
+      p->killed = 1;    // 对于不是cow的、PTE为0的(虚拟地址没有对应的物理地址)我们也要杀掉(usertests: kernmem)
     }
 
-    int rtn = 0;
-    if((rtn = cowhandler(p->pagetable, va)) != 0){
-      switch (rtn)
-      {
-      case -1:
-      printf("va >= MAXVA\n");
-        break;
-      
-      case -2:
-      printf("pte == 0\n");
-        break;
-      
-      case -3:
-      printf("pa == 0\n");
-        break;
-      
-      case -4:    // usertests中execout的点，因此不能把checkCOW放在cowhandler外围 还是要先进去的
-      printf("kalloc fail\n");    // 坑：execout会allocate all of memory 因此遇到cow page fault时kalloc会失败
-        break;
-      
-      default:
-        break;
-      }
-      p->killed = 1;
-    }
+
     // other
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);

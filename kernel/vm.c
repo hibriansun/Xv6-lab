@@ -383,11 +383,39 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
 
-    // 无论什么情况都得检查下地址合法性
-    // cowhandler内含极端非法地址检测 防止错误访问
-    if(cowhandler(pagetable, va0) != 0){
+    if(va0 >= MAXVA){
       return -1;
     }
+    // 无论什么情况都得检查下地址合法性
+    // cowhandler内含极端非法地址检测 防止错误访问
+    if(checkCOW(pagetable, va0) != 0){
+      int rtn = 0;
+      if((rtn = cowhandler(pagetable, va0)) != 0){
+        // switch (rtn)
+        // {
+        // case -1:
+        // printf("va >= MAXVA\n");
+        //   break;
+        
+        // case -2:
+        // printf("pte == 0\n");
+        //   break;
+        
+        // case -3:
+        // printf("pa == 0\n");
+        //   break;
+        
+        // case -4:    // usertests中execout的点，因此不能把checkCOW放在cowhandler外围 还是要先进去的
+        // printf("kalloc fail\n");    // 坑：execout会allocate all of memory 因此遇到cow page fault时kalloc会失败
+        //   break;
+        
+        // default:
+        //   break;
+        // }
+        return -1;
+      }
+    }
+    // 在copyout中非cow page就直接写，因为这证明是个正常页
 
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
@@ -473,13 +501,19 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 }
 
 int checkCOW(pagetable_t pagetable, uint64 va){
-  pte_t* pte;
+  pte_t* pte = walk(pagetable, va, 0);
+  if(pte == 0){
+    printf("checkCOW: pte = 0\n");
+  }
 
-  return ((pte = walk(pagetable, va, 0)) != 0) && 
-          (*pte & PTE_COW);
+  return  (pte != 0) && (*pte & PTE_COW);
 }
 
 // return: -1 fail  0 success
+// 由于cowhandler在usertrap的scase为13/15条件中
+// cowhandler只是usertrap中一种情况 我们还需应对访问非法地址，pte值为0等问题
+// 因此在trap page fault handler和copyout里的page fault handler都要考虑实现检测异常地址拒绝访问
+// 这是完胜usertests那些Corner cases的要点
 int cowhandler(pagetable_t pagetable, uint64 va){
   if (va >= MAXVA) return -1;
   pte_t* pte = walk(pagetable, PGROUNDDOWN(va), 0);
@@ -489,9 +523,9 @@ int cowhandler(pagetable_t pagetable, uint64 va){
   uint64 flags = PTE_FLAGS(*pte);
   uint64 new;
 
-  if(checkCOW(pagetable, va) == 0){
-    return 0;
-  }
+  // if(checkCOW(pagetable, va) == 0){
+  //   return 0;
+  // }
   
   new = (uint64)kalloc();
   if(new == 0)  return -4;
