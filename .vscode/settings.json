@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "cstdlib": "c",
+        "riscv.h": "c",
+        "types.h": "c",
+        "cmath": "c",
+        "*.tcc": "c",
+        "memlayout.h": "c",
+        "spinlock.h": "c",
+        "fs.h": "c",
+        "sleeplock.h": "c"
+    }
+}

@@ -5,6 +5,7 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
 
 /*
  * the kernel's page table.
@@ -14,6 +15,11 @@ pagetable_t kernel_pagetable;
 extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
+
+struct {
+  struct spinlock lock;
+  int ref[PAGECOUNT];
+} page_count;
 
 /*
  * create a direct-map page table for the kernel.
@@ -305,6 +311,9 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 // physical memory.
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
+/**
+ * Increase page-ref count only
+ */
 int
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
@@ -320,9 +329,16 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
+
+    acquire(&page_count.lock);
+    ++page_count.ref[PA2PGINDEX(pa)];
+    release(&page_count.lock);
+
+    *pte = ((*pte | PTE_COW) & ~PTE_W);
+    flags = PTE_FLAGS(*pte);
+
+    mem = (char*)pa;
+
     if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
       kfree(mem);
       goto err;
@@ -331,7 +347,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   return 0;
 
  err:
-  uvmunmap(new, 0, i / PGSIZE, 1);
+  uvmunmap(new, 0, i / PGSIZE, 1);    // decrease page ref in kfree()
   return -1;
 }
 
@@ -351,6 +367,14 @@ uvmclear(pagetable_t pagetable, uint64 va)
 // Copy from kernel to user.
 // Copy len bytes from src to virtual address dstva in a given page table.
 // Return 0 on success, -1 on error.
+/**
+ * 这里访问到的dstva可能是个引用>1 share的physical page
+ * 因此直接写入会发生page fault
+ * 
+ * 用户态访问非法地址会陷入usertrap
+ * 内核态访问非法用户虚拟地址空间地址会导致(?kerneltrap) // TODO
+ * 我们对于内核态访问这里就单独处理就好(能过测试)
+ */
 int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
@@ -358,6 +382,13 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+
+    // 无论什么情况都得检查下地址合法性
+    // cowhandler内含极端非法地址检测 防止错误访问
+    if(cowhandler(pagetable, va0) != 0){
+      return -1;
+    }
+
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
@@ -439,4 +470,36 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+int checkCOW(pagetable_t pagetable, uint64 va){
+  pte_t* pte;
+
+  return ((pte = walk(pagetable, va, 0)) != 0) && 
+          (*pte & PTE_COW);
+}
+
+// return: -1 fail  0 success
+int cowhandler(pagetable_t pagetable, uint64 va){
+  if (va >= MAXVA) return -1;
+  pte_t* pte = walk(pagetable, PGROUNDDOWN(va), 0);
+  if (pte == 0) return -1;
+  uint64 pa = PTE2PA(*pte);
+  if(pa == 0)  return -1;
+  uint64 flags = PTE_FLAGS(*pte);
+  uint64 new;
+
+  if(checkCOW(pagetable, va) == 0){
+    return 0;
+  }
+  
+  new = (uint64)kalloc();
+  if(new == 0)  return -1;
+
+  memmove((void*)new, (const void*)pa, PGSIZE);
+  kfree((void*)pa);         // 当剩1ref时也是将该page内容复制并kfree掉
+  flags = (flags | PTE_W) & ~PTE_COW;
+  *pte = PA2PTE(new) | flags;
+
+  return 0;
 }
