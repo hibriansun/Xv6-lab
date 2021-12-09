@@ -483,9 +483,9 @@ int checkCOW(pagetable_t pagetable, uint64 va){
 int cowhandler(pagetable_t pagetable, uint64 va){
   if (va >= MAXVA) return -1;
   pte_t* pte = walk(pagetable, PGROUNDDOWN(va), 0);
-  if (pte == 0) return -1;
+  if (pte == 0) return -2;
   uint64 pa = PTE2PA(*pte);
-  if(pa == 0)  return -1;
+  if(pa == 0)  return -3;
   uint64 flags = PTE_FLAGS(*pte);
   uint64 new;
 
@@ -494,7 +494,7 @@ int cowhandler(pagetable_t pagetable, uint64 va){
   }
   
   new = (uint64)kalloc();
-  if(new == 0)  return -1;
+  if(new == 0)  return -4;
 
   memmove((void*)new, (const void*)pa, PGSIZE);
   kfree((void*)pa);         // 当剩1ref时也是将该page内容复制并kfree掉

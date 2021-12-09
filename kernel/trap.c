@@ -73,7 +73,33 @@ usertrap(void)
       p->killed = 1;
     }
     
-    if(cowhandler(p->pagetable, va) != 0){
+    if(checkCOW(p->pagetable, va) == 0){
+      printf("Not cow page fault but may be not handled\n");
+    }
+
+    int rtn = 0;
+    if((rtn = cowhandler(p->pagetable, va)) != 0){
+      switch (rtn)
+      {
+      case -1:
+      printf("va >= MAXVA\n");
+        break;
+      
+      case -2:
+      printf("pte == 0\n");
+        break;
+      
+      case -3:
+      printf("pa == 0\n");
+        break;
+      
+      case -4:    // usertests中execout的点，因此不能把checkCOW放在cowhandler外围 还是要先进去的
+      printf("kalloc fail\n");    // 坑：execout会allocate all of memory 因此遇到cow page fault时kalloc会失败
+        break;
+      
+      default:
+        break;
+      }
       p->killed = 1;
     }
     // other
