@@ -480,6 +480,10 @@ int checkCOW(pagetable_t pagetable, uint64 va){
 }
 
 // return: -1 fail  0 success
+// 由于cowhandler在usertrap的scase为13/15条件中
+// cowhandler只是usertrap中一种情况 我们还需应对访问非法地址，pte值为0等问题
+// 因此在trap page fault handler和copyout里的page fault handler都要考虑实现检测异常地址拒绝访问
+// 这是完胜usertests那些Corner cases的要点
 int cowhandler(pagetable_t pagetable, uint64 va){
   if (va >= MAXVA) return -1;
   pte_t* pte = walk(pagetable, PGROUNDDOWN(va), 0);
