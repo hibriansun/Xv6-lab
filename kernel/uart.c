@@ -41,7 +41,7 @@
 // the transmit output buffer.
 struct spinlock uart_tx_lock;
 #define UART_TX_BUF_SIZE 32
-char uart_tx_buf[UART_TX_BUF_SIZE];
+char uart_tx_buf[UART_TX_BUF_SIZE];   // 输出buffer
 int uart_tx_w; // write next to uart_tx_buf[uart_tx_w++]
 int uart_tx_r; // read next from uart_tx_buf[uar_tx_r++]
 
@@ -49,7 +49,11 @@ extern volatile int panicked; // from printf.c
 
 void uartstart();
 
-// 配置好UART芯片使其可以被使用
+
+/**
+ * 配置UART硬件 在接收到一个字节时产生一个`接收中断`
+ * 在传输(发送)完毕一个字节，产生一个`传输完成中断`
+ */
 void
 uartinit(void)
 {

@@ -208,6 +208,7 @@ devintr()
     // this is a supervisor external interrupt, via PLIC.
 
     // irq indicates which device interrupted.
+    // PLIC可以告诉我们中断来自什么设备(Xv6book P50 5.1)
     int irq = plic_claim();
 
     if(irq == UART0_IRQ){

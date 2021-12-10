@@ -89,7 +89,7 @@ consoleread(int user_dst, uint64 dst, int n)
   target = n;
   acquire(&cons.lock);
   while(n > 0){
-    // wait until interrupt handler has put some
+    // "wait" until interrupt handler has put some
     // input into cons.buffer.
     while(cons.r == cons.w){
       if(myproc()->killed){
@@ -181,6 +181,10 @@ consoleintr(int c)
   release(&cons.lock);
 }
 
+/**
+ * 配置UART硬件 在接收到一个字节时产生一个`接收中断`
+ * 在传输(发送)完毕一个字节，产生一个`传输完成中断`
+ */
 void
 consoleinit(void)
 {
