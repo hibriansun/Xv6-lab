@@ -19,8 +19,9 @@
 // some have different meanings for
 // read vs write.
 // see http://byterunner.com/16550.html
-#define RHR 0                 // receive holding register (for input bytes)
-#define THR 0                 // transmit holding register (for output bytes)
+/// There are a handful of UART control registers, each the width of """a byte"""
+#define RHR 0                 // receive holding register (for input bytes) [可以从这里读走接收到的字符]
+#define THR 0                 // transmit holding register (for output bytes) [软件向该寄存器写字符，UART将其发送出去]
 #define IER 1                 // interrupt enable register
 #define IER_TX_ENABLE (1<<0)
 #define IER_RX_ENABLE (1<<1)
@@ -31,7 +32,7 @@
 #define LCR 3                 // line control register
 #define LCR_EIGHT_BITS (3<<0)
 #define LCR_BAUD_LATCH (1<<7) // special mode to set baud rate
-#define LSR 5                 // line status register
+#define LSR 5                 // line status register [表示UART中等待被读取走的FIFO是否被占用(有Ready bits表示FIFO可被读取)]
 #define LSR_RX_READY (1<<0)   // input is waiting to be read from RHR
 #define LSR_TX_IDLE (1<<5)    // THR can accept another character to send
 
@@ -169,10 +170,11 @@ uartstart()
 
 // read one input character from the UART.
 // return -1 if none is waiting.
+// 内核读取物理地址映射的UART寄存器
 int
 uartgetc(void)
 {
-  if(ReadReg(LSR) & 0x01){
+  if(ReadReg(LSR) & 0x01){    // UART内部FIFO中是否有缓冲可读
     // input data is ready.
     return ReadReg(RHR);
   } else {
@@ -189,14 +191,14 @@ uartintr(void)
 {
   // read and process incoming characters.
   while(1){
-    int c = uartgetc();
+    int c = uartgetc();   // 从UART读寄存器中读数据
     if(c == -1)
       break;
-    consoleintr(c);
+    consoleintr(c);       // 处理读到数据放入内核读环形缓冲
   }
 
   // send buffered characters.
   acquire(&uart_tx_lock);
-  uartstart();
+  uartstart();            // 让UART发送内核缓冲区中待发送数据
   release(&uart_tx_lock);
 }

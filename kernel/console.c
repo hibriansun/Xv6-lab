@@ -41,6 +41,7 @@ consputc(int c)
   }
 }
 
+// 内核接收UART传送来数据的"环形内核缓冲区"
 struct {
   struct spinlock lock;
   
@@ -78,7 +79,9 @@ consolewrite(int user_src, uint64 src, int n)
 // user_dst indicates whether dst is a user
 // or kernel address.
 //
-// 通过中断接收输入的到来
+// 中断上半部
+// sys_read() --> fileread() --> devsw[f->major].read(1, addr, n); == consoleread() [function pointer]
+// 接收用户输入字符，等待，中间发生中断填满内核缓冲区/EOF，最终结束本次读取
 int
 consoleread(int user_dst, uint64 dst, int n)
 {
@@ -130,7 +133,7 @@ consoleread(int user_dst, uint64 dst, int n)
 }
 
 //
-// the console input interrupt handler.
+// the console "input" interrupt handler.
 // uartintr() calls this for input character.
 // do erase/kill processing, append to cons.buf,
 // wake up consoleread() if a whole line has arrived.
@@ -168,7 +171,7 @@ consoleintr(int c)
       // store for consumption by consoleread().
       cons.buf[cons.e++ % INPUT_BUF] = c;
 
-      if(c == '\n' || c == C('D') || cons.e == cons.r+INPUT_BUF){
+      if(c == '\n' || c == C('D') || cons.e == cons.r+INPUT_BUF){   // 终止本次输入字符(read)条件
         // wake up consoleread() if a whole line (or end-of-file)
         // has arrived.
         cons.w = cons.e;

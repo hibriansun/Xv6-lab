@@ -114,7 +114,7 @@ fileread(struct file *f, uint64 addr, int n)
   if(f->type == FD_PIPE){
     r = piperead(f->pipe, addr, n);
   } else if(f->type == FD_DEVICE){
-    if(f->major < 0 || f->major >= NDEV || !devsw[f->major].read)
+    if(f->major < 0 || f->major >= NDEV || !devsw[f->major].read)     // 设备被当做文件处理(因此这里有读写设备文件)
       return -1;
     r = devsw[f->major].read(1, addr, n);
   } else if(f->type == FD_INODE){
