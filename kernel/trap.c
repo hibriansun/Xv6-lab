@@ -6,6 +6,7 @@
 #include "proc.h"
 #include "defs.h"
 
+// 对时钟计数tick的竞争保护，tick可能在时钟中断clockintr改写也可能在sys_sleep中读取
 struct spinlock tickslock;
 uint ticks;
 
@@ -103,7 +104,7 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
-    yield();
+    yield();          // 由于是时钟中断在这里调用yield，产生任务调度
 
   usertrapret();
 }

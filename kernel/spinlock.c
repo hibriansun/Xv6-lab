@@ -18,9 +18,11 @@ initlock(struct spinlock *lk, char *name)
 
 // Acquire the lock.
 // Loops (spins) until the lock is acquired.
+// acquire自身是不能放弃CPU的，这里一开始就关中断了，目的是为了防止同一CPU上普通线程与中断争用同一把锁导致死锁(sys_sleep 与 clockintr)
 void
 acquire(struct spinlock *lk)
 {
+  // 如果不关闭中断，不保证从acquire到release同一把锁这段代码能一次性原子性地执行完，那么就可能导致
   push_off(); // disable interrupts to avoid deadlock.
   if(holding(lk))
     panic("acquire");       // 检测死锁
@@ -29,6 +31,12 @@ acquire(struct spinlock *lk)
   //   a5 = 1
   //   s1 = &lk->locked
   //   amoswap.w.aq a5, a5, (s1)
+
+  // wrap the swap in a loop, retrying(spinning) until it has acquired the lock
+  // amoswap  r, a  -- read the value from register a(address), and put the value into register r(address)
+  // __sync_lock_test_and_set wrap the amoswap instruction and returning the old value the register it written
+
+  // 对于synchronize指令，任何在它之前的load/store指令，都不能移动到它之后
   while(__sync_lock_test_and_set(&lk->locked, 1) != 0)      // 实现自旋 与 原子占用操作
     ;
 
@@ -87,7 +95,7 @@ holding(struct spinlock *lk)
 // push_off/pop_off are like intr_off()/intr_on() except that they are matched:
 // it takes two pop_off()s to undo two push_off()s.  Also, if interrupts
 // are initially off, then push_off, pop_off leaves them off.
-
+// To track the nesting level of locks on the current CPU
 void
 push_off(void)
 {

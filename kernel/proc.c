@@ -527,7 +527,7 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
-  p->state = RUNNABLE;
+  p->state = RUNNABLE;    // 转为就绪态
   sched();
   release(&p->lock);
 }
