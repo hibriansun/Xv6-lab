@@ -22,6 +22,8 @@ static void freeproc(struct proc *p);
 extern char trampoline[]; // trampoline.S
 
 // initialize the proc table at boot time.
+// 初始化"每个CPU上正在跑的进程记录表"
+// 初始化锁、分配进程的内核栈
 void
 procinit(void)
 {
@@ -37,11 +39,11 @@ procinit(void)
       char *pa = kalloc();
       if(pa == 0)
         panic("kalloc");
-      uint64 va = KSTACK((int) (p - proc));
+      uint64 va = KSTACK((int) (p - proc));           // 内核虚拟地址空间地址
       kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
-      p->kstack = va;
+      p->kstack = va;   // 记录进程内核栈地址
   }
-  kvminithart();
+  kvminithart();        // TODO 为什么还要再开启一遍呢
 }
 
 // Must be called with interrupts disabled,
@@ -66,10 +68,10 @@ mycpu(void) {
 // Return the current struct proc *, or zero if none.
 struct proc*
 myproc(void) {
-  push_off();
+  push_off();   // disable interrupt to avoid processes yeilding because of timer interrupt
   struct cpu *c = mycpu();
   struct proc *p = c->proc;
-  pop_off();
+  pop_off();   // enable interrupt
   return p;
 }
 
