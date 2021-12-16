@@ -22,7 +22,7 @@ struct context {
 // Per-CPU state.
 struct cpu {
   struct proc *proc;          // The process running on this cpu, or null.  // 该CPU运行任务了吗，是运行哪个进程
-  struct context context;     // swtch() here to enter scheduler().         // 上下文(saved registers for the CPU’s scheduler thread)
+  struct context context;     // swtch() here to enter scheduler().         // 内核调度器线程的寄存器(上下文)(saved registers for the CPU’s scheduler thread)
   int noff;                   // Depth of push_off() nesting.               // to track the nesting level of locks on the current CPU
   int intena;                 // Were interrupts enabled before push_off()? // 关闭中断前中断开关状态
 };
@@ -96,11 +96,14 @@ struct proc {
   int pid;                     // Process ID
 
   // these are private to the process, so p->lock need not be held.
-  uint64 kstack;               // Virtual address of kernel stack
+  uint64 kstack;               // Virtual address of kernel stack     // 用户进程的内核线程执行时使用的函数栈空间
   uint64 sz;                   // Size of process memory (bytes)      // 程序的heap向上拓展，sz即为sbrk拓展heap的位置 https://i.loli.net/2021/11/29/jInyDJB9Yog8QxN.png
   pagetable_t pagetable;       // User page table
-  struct trapframe *trapframe; // data page for trampoline.S
-  struct context context;      // swtch() here to run process
+
+  // 两类寄存器 -- 用户进程寄存器(保存至trapframe)  用户进程的内核线程的寄存器(保存至context) 还有一种调度器内核线程寄存器在CPU struct中
+  struct trapframe *trapframe; // data page for trampoline.S          // 切入内核时需要保存到的"用户空间状态" 内含PC指针(program counter)
+  struct context context;      // swtch() here to run process         // 用户进程进入内核运行其所属的内核线程，context是内核线程的内核寄存器
+  
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)

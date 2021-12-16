@@ -451,7 +451,7 @@ wait(uint64 addr)
   }
 }
 
-// Per-CPU process scheduler.
+// Per-CPU process scheduler. (每个CPU都有一个Scheduler，每个CPU遍历所有进程调度)
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
 //  - choose a process to run.
@@ -471,6 +471,10 @@ scheduler(void)
     
     int nproc = 0;
     for(p = proc; p < &proc[NPROC]; p++) {
+    // >>> p->lock: 对选出的新进程处理 <<<
+    // 选择一个进程将其投入运行时，会将该进程的内核线程的context加载到寄存器中，这个阶段不能进入中断
+    // 否则进程被修改成running后，但其寄存器值没有被加载全转而就去执行中断，中断又对该内核线程寄存器进行不完整保存到context对象，形成错误
+    // 在这种情况下，切换到一个新进程的过程中，也需要获取新进程的锁以确保其他的CPU核不能看到这个进程
       acquire(&p->lock);
       if(p->state != UNUSED) {
         nproc++;
@@ -503,6 +507,7 @@ scheduler(void)
 // be proc->intena and proc->noff, but that would
 // break in the few places where a lock is held but
 // there's no process.
+// 这里仅仅做一些确认性的检测，然后通过swtch调到真正的调度线程
 void
 sched(void)
 {
@@ -519,7 +524,7 @@ sched(void)
     panic("sched interruptible");
 
   intena = mycpu()->intena;
-  swtch(&p->context, &mycpu()->context);
+  swtch(&p->context, &mycpu()->context);  // 将这个用户进程的 内核线程 的寄存器保存在进程的context中，寄存器中内容替换成cpu的context中寄存器内容(CPU调度线程的寄存器)
   mycpu()->intena = intena;
 }
 
@@ -528,7 +533,12 @@ void
 yield(void)
 {
   struct proc *p = myproc();
-  acquire(&p->lock);
+
+  // >>> p->lock: 对旧进程处理 <<<
+  // 我们需要将旧进程的状态从RUNNING改成RUNABLE，我们需要将内核线程的寄存器保存在context对象中，并且我们还需要停止使用当前内核线程的内核栈
+  // 这三步需要原子性完成，防止中断干扰
+  acquire(&p->lock);      // 会关闭中断
+
   p->state = RUNNABLE;    // 转为就绪态
   sched();
   release(&p->lock);
