@@ -128,8 +128,8 @@ found:
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
-  p->context.ra = (uint64)forkret;    // 返回地址
-  p->context.sp = p->kstack + PGSIZE; // TODO ??? 分配栈空间
+  p->context.ra = (uint64)forkret;    // 对于新建的用户进程，其内核线程被调度线程调度运行时从调度线程切换到该进程的内核线程的那个地方在这里被设置
+  p->context.sp = p->kstack + PGSIZE; // 同上，被再次swtch执行该内核线程时使用的函数调用内核栈在这里被记录恢复时从这里读取加载到sp寄存器
 
   return p;
 }
@@ -212,6 +212,7 @@ uchar initcode[] = {
 };
 
 // Set up first user process.
+// 建立    第一个用户进程 (其他用户进程的创建都是通过fork)
 void
 userinit(void)
 {
@@ -562,7 +563,7 @@ forkret(void)
     fsinit(ROOTDEV);
   }
 
-  usertrapret();
+  usertrapret();  // 是一个假的函数，它会使得程序表现的看起来像是从trap中返回，但是对应的trapframe其实也是假的，这样才能跳到用户的第一个指令中
 }
 
 // Atomically release lock and sleep on chan.

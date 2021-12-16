@@ -14,7 +14,7 @@
 
 # a1是调用swtch函数的第二个参数
 # mycpu()->context是之前所属CPU的调度器线程使用的寄存器内容暂存的数据结构 这里将这些数据从内存中恢复load到寄存器中准备给调度器使用
-# 这里关键是设置ra寄存器为上次离开调度器scheduler函数的地方 proc.c:488[swtch(&c->context, &p->context);]
+# 这里关键是设置ra寄存器为上次离开调度器scheduler函数的地方 proc.c:489[swtch(&c->context, &p->context);]
 .globl swtch
 swtch:
         sd ra, 0(a0)
