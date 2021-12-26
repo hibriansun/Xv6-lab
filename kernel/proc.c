@@ -476,7 +476,7 @@ scheduler(void)
     // 选择一个进程将其投入运行时，会将该进程的内核线程的context加载到寄存器中，这个阶段不能进入中断
     // 否则进程被修改成running后，但其寄存器值没有被加载全转而就去执行中断，中断又对该内核线程寄存器进行不完整保存到context对象，形成错误
     // 在这种情况下，切换到一个新进程的过程中，也需要获取新进程的锁以确保其他的CPU核不能看到这个进程
-      acquire(&p->lock);
+      acquire(&p->lock);      // 这里的acquir会在返回后某地释放(yield sleep)
       if(p->state != UNUSED) {
         nproc++;
       }
@@ -486,7 +486,7 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
-        swtch(&c->context, &p->context);
+        swtch(&c->context, &p->context);    // 执行swtch后下一步执行的就是ra，也就是放弃CPU时进程执行的代码的位置sched()
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -517,7 +517,7 @@ sched(void)
 
   if(!holding(&p->lock))
     panic("sched p->lock");
-  if(mycpu()->noff != 1)
+  if(mycpu()->noff != 1)  // 保证除了进程本身的锁之外其他的锁在进程被调度之前已经被释放，否则另一进程可能争用锁产生死锁(一旦acquire锁会关中断 因此时间中断无法解开死锁)
     panic("sched locks");
   if(p->state == RUNNING)
     panic("sched running");
@@ -538,7 +538,7 @@ yield(void)
   // >>> p->lock: 对旧进程处理 <<<
   // 我们需要将旧进程的状态从RUNNING改成RUNABLE，我们需要将内核线程的寄存器保存在context对象中，并且我们还需要停止使用当前内核线程的内核栈
   // 这三步需要原子性完成，防止中断干扰
-  acquire(&p->lock);      // 会关闭中断
+  acquire(&p->lock);      // 会关闭中断  这里对进程的加锁会在scheduler中解锁
 
   p->state = RUNNABLE;    // 转为就绪态
   sched();
