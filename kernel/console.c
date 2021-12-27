@@ -66,7 +66,7 @@ consolewrite(int user_src, uint64 src, int n)
     char c;
     if(either_copyin(&c, user_src, src+i, 1) == -1)
       break;
-    uartputc(c);
+    uartputc(c);    // 这里硬件写入的耗时可能对于计算机非常长，硬生生在这里busy waiting不是个办法 --> sleep & wakeup 在sleep时让CPU干其他活
   }
   release(&cons.lock);
 
