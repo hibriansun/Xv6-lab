@@ -332,6 +332,7 @@ reparent(struct proc *p)
   }
 }
 
+// Xv6中两种结束进程的方式 -- kill and exit
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait().
@@ -380,12 +381,12 @@ exit(int status)
   // the parent-then-child rule says we have to lock it first.
   acquire(&original_parent->lock);
 
-  acquire(&p->lock);
+  acquire(&p->lock);      // 使得父进程看不见子进程p, wait()中acquire(&np->lock);得不到该子进程锁直到完成子进程状态改变然后调用sched
 
   // Give any children to init.
   reparent(p);
 
-  // Parent might be sleeping in wait().
+  // Parent 'might be' sleeping in wait().
   wakeup1(original_parent);
 
   p->xstate = status;
@@ -393,8 +394,10 @@ exit(int status)
 
   release(&original_parent->lock);
 
+  // 截止到现在 Child也没有free所有的resources，因为其还在执行，父进程此时清除子进程执行所需要的资源在wait中
+
   // Jump into the scheduler, never to return.
-  sched();
+  sched();                // 会释放子进程的锁
   panic("zombie exit");
 }
 
@@ -515,7 +518,7 @@ sched(void)
   int intena;
   struct proc *p = myproc();
 
-  if(!holding(&p->lock))
+  if(!holding(&p->lock))  // 保证该CPU正在运行的进程必须持有锁
     panic("sched p->lock");
   if(mycpu()->noff != 1)  // 保证除了进程本身的锁之外其他的锁在进程被调度之前已经被释放，否则另一进程可能争用锁产生死锁(一旦acquire锁会关中断 因此时间中断无法解开死锁)
     panic("sched locks");
@@ -588,7 +591,7 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = chan;
   p->state = SLEEPING;
 
-  sched();
+  sched();      // 调用swtch切换到其他线程上去执行 scheduler会释放最近运行进程锁 释放后wakeup则可以获取到进程锁并对其进行唤醒
 
   // Tidy up.
   p->chan = 0;
@@ -617,7 +620,7 @@ wakeup(void *chan)
 }
 
 // Wake up p if it is sleeping in wait(); used by exit().
-// Caller must hold p->lock.
+// Caller 'must hold' p->lock.
 static void
 wakeup1(struct proc *p)
 {

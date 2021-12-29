@@ -239,7 +239,7 @@ virtio_disk_rw(struct buf *b, int write)
 
   // Wait for virtio_disk_intr() to say request has finished.
   while(b->disk == 1) {
-    sleep(b, &disk.vdisk_lock);
+    sleep(b, &disk.vdisk_lock);     // 这里sleep就算被kill那里唤醒也不会检查p->kill从而退出的，还是要完成IO操作后再返回
   }
 
   disk.info[idx[0]].b = 0;
