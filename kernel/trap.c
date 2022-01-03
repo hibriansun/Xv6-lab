@@ -104,7 +104,7 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
-    yield();          // 由于是时钟中断在这里调用yield，产生任务调度
+    yield();          // 由于是时钟中断在这里调用yield，产生任务调度sched
 
   usertrapret();
 }

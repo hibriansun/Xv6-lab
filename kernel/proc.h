@@ -19,7 +19,7 @@ struct context {
   uint64 s11;
 };
 
-// Per-CPU state.
+// Per-CPU state. (每个CPU都有这样一个结构体 Per-CPU变量)
 struct cpu {
   struct proc *proc;          // The process running on this cpu, or null.  // 该CPU运行任务了吗，是运行哪个进程
   struct context context;     // swtch() here to enter scheduler().         // 内核调度器线程的寄存器(上下文)(saved registers for the CPU’s scheduler thread)

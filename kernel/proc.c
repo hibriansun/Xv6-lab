@@ -479,7 +479,7 @@ scheduler(void)
     // 选择一个进程将其投入运行时，会将该进程的内核线程的context加载到寄存器中，这个阶段不能进入中断
     // 否则进程被修改成running后，但其寄存器值没有被加载全转而就去执行中断，中断又对该内核线程寄存器进行不完整保存到context对象，形成错误
     // 在这种情况下，切换到一个新进程的过程中，也需要获取新进程的锁以确保其他的CPU核不能看到这个进程
-      acquire(&p->lock);      // 这里的acquir会在返回后某地释放(yield sleep)
+      acquire(&p->lock);      // 这里的acquir会在返回后某地释放(yield sleep forkret)
       if(p->state != UNUSED) {
         nproc++;
       }
@@ -548,6 +548,11 @@ yield(void)
   release(&p->lock);
 }
 
+
+// There is one case when the scheduler’s call to swtch does not end up in sched. When a new
+// process is first scheduled, it begins at forkret.
+// 新进程在allocproc时，设置了新进程的context的ra为forkret，那么当某个CPU上发生调度时，scheduler会选择到这个新进程，这个新进程就从这个
+// 地方(forkret)开始执行
 // A fork child's very first scheduling by scheduler()
 // will swtch to forkret.
 void
@@ -555,7 +560,7 @@ forkret(void)
 {
   static int first = 1;
 
-  // Still holding p->lock from scheduler.
+  // Still holding p->lock from scheduler.(在开始挑选任务时)
   release(&myproc()->lock);
 
   if (first) {
