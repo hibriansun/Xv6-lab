@@ -545,7 +545,7 @@ yield(void)
 
   p->state = RUNNABLE;    // 转为就绪态
   sched();
-  release(&p->lock);
+  release(&p->lock);      // 在scheduler中加的锁 这里释放
 }
 
 
@@ -587,12 +587,12 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup locks p->lock),
   // so it's okay to release lk.
-  if(lk != &p->lock){  //DOC: sleeplock0
+  if(lk != &p->lock){  //DOC: sleeplock0 预防对p->lock加锁导致死锁
     acquire(&p->lock);  //DOC: sleeplock1
-    release(lk);
+    release(lk);        // 这里如果不解锁可能造成死锁 详见xv6 book中信号量的实现
   }
 
-  // Go to sleep.
+  // Go to sleep.     通过记录它的sleep channel和标记SLEEPING状态 将process作为睡眠
   p->chan = chan;
   p->state = SLEEPING;
 
@@ -603,8 +603,8 @@ sleep(void *chan, struct spinlock *lk)
 
   // Reacquire original lock.
   if(lk != &p->lock){
-    release(&p->lock);
-    acquire(lk);
+    release(&p->lock);      // wakeup设置同chan的sleep proc为RUNNABLE待调度器恢复运行到sleep中sched后 scheduler挑选进程时加的锁在这里解锁
+    acquire(lk);            // 在开始sleep时放开的非进程锁在这里恢复加锁
   }
 }
 
