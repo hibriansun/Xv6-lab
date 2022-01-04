@@ -110,10 +110,14 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
 
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
-    return 0;
-  if((*pte & PTE_V) == 0)
-    return 0;
+  if(pte == 0 || (*pte & PTE_V) == 0)  // Invaild address OR 合法虚拟地址空间地址但没被映射由于lazy allocation
+  {
+    if ((va >= myproc()->sz || va <= PGROUNDDOWN(myproc()->trapframe->sp))) {  // Invaild address
+      return 0;
+    }
+    return -1;
+  }
+
   if((*pte & PTE_U) == 0)
     return 0;
   pa = PTE2PA(*pte);
@@ -347,9 +351,11 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
+      continue;
+      // panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      continue;
+      // panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -391,12 +397,31 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
+
+    if(pa0 == -1) {
+      // 合法虚拟地址空间地址但没被映射由于lazy allocation
+      char* mem = (char*)kalloc();
+      if(mem == 0){
+        panic("Lazy allocation failed: out of memory");
+      }
+      memset((void*)mem, 0, PGSIZE);
+      // map
+      if(mappages(pagetable, PGROUNDDOWN(va0), PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_U) != 0){
+        kfree((void*)mem);
+        uvmdealloc(pagetable, PGROUNDUP(va0), PGROUNDDOWN(va0));
+        panic("Lazy allocation failed");
+      }
+      pa0 = PTE2PA(*walk(pagetable, va0, 0));
+    }
+
+
     if(pa0 == 0)
       return -1;
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
-    memmove((void *)(pa0 + (dstva - va0)), src, n);
+    if(pa0 != -1)
+      memmove((void *)(pa0 + (dstva - va0)), src, n);
 
     len -= n;
     src += n;

@@ -652,6 +652,12 @@ wakeup1(struct proc *p)
 // Kill the process with the given pid.
 // The victim won't exit until it tries to return
 // to user space (see usertrap() in trap.c).
+// kill几乎不会做什么事情，不会直接杀死某个进程，只是对进程的killed标志进行标识
+// 在后续合适的位置(例如在trap.c中)检测这个标志return结束这个被标记的进程
+// 1. 系统调用、时钟中断等trap后
+// 2. 一些需要长时间等待的操作可能睡眠我们将其唤醒后检测killed标志是否将其退出
+//    例如：piperead()，buffer一直为空，我们要kill这个process，必须尽快使其结束，而不能一致等待sleep直到能读到数据
+//         
 int
 kill(int pid)
 {
@@ -661,7 +667,7 @@ kill(int pid)
     acquire(&p->lock);
     if(p->pid == pid){
       p->killed = 1;
-      if(p->state == SLEEPING){
+      if(p->state == SLEEPING){   // 减少等待，不会让等待输入的进程等到很久之后输入了再被kill
         // Wake process from sleep().
         p->state = RUNNABLE;
       }
