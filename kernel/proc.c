@@ -332,10 +332,19 @@ reparent(struct proc *p)
   }
 }
 
+// sleep和wakeup可以用于许多种需要等待的情况。在xv6book第1章中介绍的一个有趣的例子是，一个子进程的exit和其父进程的wait之间的交互。
+// 在子进程退出的时候，父进程可能已经在wait中睡眠了，也可能在做别的事情；在后一种情况下，后续的wait调用必须观察子进程的退出，也许是在它调用exit之后很久。
+// xv6在wait观察到子进程退出之前，记录子进程退出的方式是让exit将调用进程设置为ZOMBIE状态，在那里停留，直到父进程的wait注意到它，
+// 将子进程的状态改为UNUSED，复制子进程的退出状态，并将子进程的进程ID返回给父进程。如果父进程比子进程先退出，父进程就把子进程交给init进程，
+// 而init进程则循环的调用wait；这样每个子进程都有一个“父进程”来清理。主要的实现挑战是父进程和子进程的wait和exit，
+// 以及exit和exit之间可能出现竞争和死锁的情况。
+
 // Xv6中两种结束进程的方式 -- kill and exit
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait().
+// 每个退出exit的进程都有来自父进程的wait
+// 要退出的这个子进程不能释放全部自己的资源供重新利用，因为自己还在执行，会到父进程中wait再释放这个释放半截的子进程
 void
 exit(int status)
 {
@@ -363,6 +372,8 @@ exit(int status)
   // acquired any other proc lock. so wake up init whether that's
   // necessary or not. init may miss this wakeup, but that seems
   // harmless.
+  // 任何一个进程的退出必须有父进程的等待，如果某一个进程有为子进程(即本身为父进程)，那么这个父进程退出时需要把自己所有的子进程reparent
+  // 这里是给要退出的"子进程"的子进程们找新的父进程(init进程)
   acquire(&initproc->lock);
   wakeup1(initproc);
   release(&initproc->lock);
@@ -373,6 +384,7 @@ exit(int status)
   // exiting parent, but the result will be a harmless spurious wakeup
   // to a dead or wrong process; proc structs are never re-allocated
   // as anything else.
+  // 处理罕见情况：该进程和该进程的父进程可能同时退出
   acquire(&p->lock);
   struct proc *original_parent = p->parent;
   release(&p->lock);
@@ -381,7 +393,7 @@ exit(int status)
   // the parent-then-child rule says we have to lock it first.
   acquire(&original_parent->lock);
 
-  acquire(&p->lock);      // 使得父进程看不见子进程p, wait()中acquire(&np->lock);得不到该子进程锁直到完成子进程状态改变然后调用sched
+  acquire(&p->lock);  // 使得父进程(original_parent)看不见子进程p (父进程执行wait()时acquire(&np->lock)看不到该子进程 会spin等待)
 
   // Give any children to init.
   reparent(p);
@@ -390,19 +402,20 @@ exit(int status)
   wakeup1(original_parent);
 
   p->xstate = status;
-  p->state = ZOMBIE;
+  p->state = ZOMBIE;      // 这个进程很多资源都还没有被清理，因此我们设置一个中间状态ZOMBIE，待到**wait**中再清理占用资源、改变状态并可供重新利用
 
   release(&original_parent->lock);
 
   // 截止到现在 Child也没有free所有的resources，因为其还在执行，父进程此时清除子进程执行所需要的资源在wait中
 
   // Jump into the scheduler, never to return.
-  sched();                // 会释放子进程的锁
+  sched();                // 会释放子进程的锁，此时父进程的wait可以看到该子进程并获取它的锁并予以释放资源回收利用
   panic("zombie exit");
 }
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
+// 每个退出exit的进程都有来自父进程的wait
 int
 wait(uint64 addr)
 {
@@ -421,7 +434,7 @@ wait(uint64 addr)
       // this code uses np->parent without holding np->lock.
       // acquiring the lock first would cause a deadlock,
       // since np might be an ancestor, and we already hold p->lock.
-      if(np->parent == p){
+      if(np->parent == p){    // np值可能等于p，因此不能先对np加锁，否则可能导致死锁。但不用考虑数据安全性吗：一个进程的父进程字段只有“父亲“改变，所以如果np->parent==p为真，除非当前进程改变它，否则该值就不会改变。
         // np->parent can't change between the check and the acquire()
         // because only the parent changes it, and we're the parent.
         acquire(&np->lock);
