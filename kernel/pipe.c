@@ -113,7 +113,6 @@ piperead(struct pipe *pi, uint64 addr, int n)
 
   acquire(&pi->lock);
   while(pi->nread == pi->nwrite && pi->writeopen){  //DOC: pipe-empty
-    // pr->killed = 1;
     if(pr->killed){         // 需要检测是否需要被kill掉，kill函数会标记且唤醒需要被杀死进程，在这里执行具体退出操作
       release(&pi->lock);
       return -1;

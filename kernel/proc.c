@@ -656,8 +656,7 @@ wakeup1(struct proc *p)
 // 在后续合适的位置(例如在trap.c中)检测这个标志return结束这个被标记的进程
 // 1. 系统调用、时钟中断等trap后
 // 2. 一些需要长时间等待的操作可能睡眠我们将其唤醒后检测killed标志是否将其退出
-//    例如：piperead()，buffer一直为空，我们要kill这个process，必须尽快使其结束，而不能一致等待sleep直到能读到数据
-//         
+//    例如：piperead()，buffer一直为空，我们要kill这个process，必须尽快使其结束，而不能一致等待sleep直到能读到数据，这里return到trap中，因为piperead本身也是系统调用
 int
 kill(int pid)
 {
