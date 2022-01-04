@@ -10,11 +10,13 @@
 
 #define PIPESIZE 512
 
+// full buffer: nwrite - nread == PIPESIZE
+// empty buffer: nwrite - nread == 0
 struct pipe {
   struct spinlock lock;
   char data[PIPESIZE];
-  uint nread;     // number of bytes read
-  uint nwrite;    // number of bytes written
+  uint nread;     // total number of bytes read
+  uint nwrite;    // total number of bytes written
   int readopen;   // read fd is still open
   int writeopen;  // write fd is still open
 };
@@ -73,6 +75,8 @@ pipeclose(struct pipe *pi, int writable)
     release(&pi->lock);
 }
 
+
+// piperead会在buffer为空时在nwrite的channel上睡觉
 int
 pipewrite(struct pipe *pi, uint64 addr, int n)
 {
@@ -99,6 +103,7 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
   return i;
 }
 
+// piperead会在buffer为空时在nread的channel上睡觉
 int
 piperead(struct pipe *pi, uint64 addr, int n)
 {
@@ -115,7 +120,7 @@ piperead(struct pipe *pi, uint64 addr, int n)
     sleep(&pi->nread, &pi->lock); //DOC: piperead-sleep
   }
   for(i = 0; i < n; i++){  //DOC: piperead-copy
-    if(pi->nread == pi->nwrite)
+    if(pi->nread == pi->nwrite)   // full
       break;
     ch = pi->data[pi->nread++ % PIPESIZE];
     if(copyout(pr->pagetable, addr + i, &ch, 1) == -1)
