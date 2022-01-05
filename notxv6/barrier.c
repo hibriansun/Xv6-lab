@@ -25,12 +25,25 @@ barrier_init(void)
 static void 
 barrier()
 {
-  // YOUR CODE HERE
+
   //
   // Block until all threads have called barrier() and
   // then increment bstate.round.
   //
-  
+  pthread_mutex_lock(&bstate.barrier_mutex);
+  bstate.nthread++;
+  if (nthread == bstate.nthread) {
+    bstate.round++;
+    bstate.nthread = 0;
+    pthread_cond_broadcast(&bstate.barrier_cond);
+  } else {
+    // 等待条件变量的特殊条件发生；pthread_cond_wait() 必须与一个pthread_mutex配套使用。
+    // 该函数调用实际上依次做了3件事：对当前pthread_mutex解锁、把当前线程挂起到当前条件变量的线程队列、
+    // 被其它线程的信号唤醒后对当前pthread_mutex申请加锁。如果线程收到一个信号被唤醒，将被配套的互斥锁重新锁住，
+    // pthread_cond_wait() 函数将不返回直到线程获得配套的互斥锁。需要注意的是，一个条件变量不应该与多个互斥锁配套使用。
+    pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
+  }
+  pthread_mutex_unlock(&bstate.barrier_mutex);
 }
 
 static void *
