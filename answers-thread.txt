@@ -1,0 +1,39 @@
+Q: Why are there missing keys with 2 threads, but not with 1 thread? 
+   Identify a sequence of events with 2 threads that can lead to a key being missing. 
+   Submit your sequence with a short explanation in answers-thread.txt
+
+A:
+```shell
+
+$ ./ph 2
+100000 puts, 4.074 seconds, 24544 puts/second
+1: 15364 keys missing
+0: 15364 keys missing
+200000 gets, 6.624 seconds, 30193 gets/second
+
+```
+
+As shown above, a lot of entries have not been put into hash table properly.
+This parallel version presents a race condition between multiple threads.
+The race condition issue appears when two different parallel threads may need to be written in the same memory position.
+The two thread may write the same key in the same place and the operation is not atomic.
+When the two threads excute here:
+```c
+
+  if(e){
+    // update the existing key.
+    e->value = value;
+  }
+
+```
+
+The assign operation is not atomic.
+See assembly codes here: https://s2.loli.net/2022/01/05/NJfsYd7DEmMkjXr.png
+```riscv-asm
+
+      ld      a5,-24(s0)
+      lw      a4,-40(s0)
+      sw      a4,4(a5)
+
+```
+As said above, the assign operation is not atomic.
