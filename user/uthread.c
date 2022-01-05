@@ -32,6 +32,7 @@ struct user_context {
 
 struct thread {
   // thread_X函数执行在这个用户栈上，如果栈指针设置错误执行过程中可能对state值改写导致bug(正是第一次无法通过的原因)
+  char                  stack_guard[STACK_SIZE]; /* the thread's stack guard */
   char                  stack[STACK_SIZE]; /* the thread's stack */
   int                   state;             /* FREE, RUNNING, RUNNABLE */
   struct user_context   context;
@@ -110,7 +111,7 @@ thread_create(void (*func)())
   // set ra the function
   t->context.ra = (uint64)func;
   // set up the stack 
-  t->context.sp = (uint64)t->stack;
+  t->context.sp = (uint64)t->stack;      // 这里卡住了好久 栈的使用(增长)是从栈高地址向低地址使用的
 }
 
 void 
