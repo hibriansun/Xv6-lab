@@ -1,4 +1,4 @@
-// Sleeping locks
+// Sleeping locks -- 即Mutex，锁的争用结果是睡眠等待直到可以用锁
 
 #include "types.h"
 #include "riscv.h"

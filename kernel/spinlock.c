@@ -1,4 +1,6 @@
 // Mutual exclusion spin locks.
+// SpinLock之所以在一些场景下很高效是因为旋等消耗的时钟周期远小于上下文交换产生的时间
+// 所以说spinlock更适合内核态不适合用户态，因为在用户态没办法知道有没有另外一个CPU在处理你所需要的资源，其不适合多线程争抢一个资源的场景
 
 #include "types.h"
 #include "param.h"

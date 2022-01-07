@@ -4,6 +4,9 @@
 // user code, and calls into file.c and fs.c.
 //
 
+// 由于涉及到I/O，一次硬件I/O需要花费大量时间，因此在文件系统中使用锁用的都是sleeplock(mutex)而不是spinlock
+// spinlock的busy waiting导致的代价会很大
+
 #include "types.h"
 #include "riscv.h"
 #include "defs.h"
