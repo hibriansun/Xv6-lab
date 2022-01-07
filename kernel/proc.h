@@ -41,6 +41,7 @@ extern struct cpu cpus[NCPU];
 // the trapframe includes callee-saved user registers like s0-s11 because the
 // return-to-user path via usertrapret() doesn't return through
 // the entire kernel call stack.
+// 32个用户寄存器都在这里 我们会在进内核态的时候将全部的32个用户寄存器保存到trapframe中(uservec in Trampoline.S)
 struct trapframe {
   /*   0 */ uint64 kernel_satp;   // kernel page table
   /*   8 */ uint64 kernel_sp;     // top of process's kernel stack
