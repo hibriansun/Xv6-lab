@@ -128,7 +128,7 @@ found:
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
-  p->context.ra = (uint64)forkret;    // 对于新建的用户进程，其内核线程被调度线程调度运行时从调度线程切换到该进程的内核线程的那个地方在这里被设置
+  p->context.ra = (uint64)forkret;    // 新进程在allocproc时，设置了新进程的context的ra为forkret，那么当某个CPU上发生调度时，scheduler会选择到这个新进程，这个新进程就从这个地方(forkret)开始执行
   p->context.sp = p->kstack + PGSIZE; // 同上，被再次swtch执行该内核线程时使用的函数调用内核栈在这里被记录恢复时从这里读取加载到sp寄存器
 
   return p;

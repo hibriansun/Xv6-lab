@@ -7,15 +7,28 @@
 #include "fs.h"
 #include "buf.h"
 
+/**
+ 对于进程的写操作，Xv6是这样做的：
+ 一个syscall记录所有的写操作成一个日志，当所有的写操作被打包记录成一个日志时，内核向disk写一个特殊的commit，表示该日志为complete状态(所有写操作记录完成)
+ 之后这个syscall再去将所有要真正写入的数据copy至disk
+ 当写操作完成，syscall还会清除该log
+ 
+ <所以说当一个日志所属的所有写操作真正完成后，日志应该是不见了的，如果crash后日志还在，并标明complete说明那一连串原子
+ 性的写操作失败，还是会恢复写操作保证其成功，但如果日志都没有标记complete标志说明日志不完整，那么将被recovery code忽略，这些写操作丢失>
+ <commit是标志，commit之前生成的日志是没有complete标记，无法被恢复写操作，commit后的日志有complete标记 可以被恢复> 
+ */
+
+
 // Simple logging that allows concurrent FS system calls.
 //
 // A log transaction contains the updates of multiple FS system
 // calls. The logging system only commits when there are
-// no FS system calls active. Thus there is never
-// any reasoning required about whether a commit might
-// write an uncommitted system call's updates to disk.
+// no FS system calls active.(防止一个涉及文件系统的syscall分裂到几个事务中)
+// Thus there is never any reasoning required about whether 
+// a commit might write an uncommitted system call's updates to disk.
+// 因此，对于a commit是否会将未提交的系统调用的更新写入磁盘，永远不需要进行任何推理。
 //
-// A system call should call begin_op()/end_op() to mark
+// A system call should call ``begin_op()/end_op()`` to mark
 // its start and end. Usually begin_op() just increments
 // the count of in-progress FS system calls and returns.
 // But if it thinks the log is close to running out, it
@@ -23,7 +36,7 @@
 //
 // The log is a physical re-do log containing disk blocks.
 // The on-disk log format:
-//   header block, containing block #s for block A, B, C, ...
+//   header block, containing block #s(block (index) number) for block A, B, C, ...
 //   block A
 //   block B
 //   block C
@@ -33,14 +46,14 @@
 // Contents of the header block, used for both the on-disk header block
 // and to keep track in memory of logged block# before commit.
 struct logheader {
-  int n;
-  int block[LOGSIZE];
+  int n;   // counter: 修改的struct buf块数(未写入disk上data block的block数 在commit后置0)
+  int block[LOGSIZE];  // 修改的struct buf块对应的扇区号数组
 };
 
 struct log {
   struct spinlock lock;
-  int start;
-  int size;
+  int start;       // logstart
+  int size;        // Number of log blocks (struct superlog.nlog)
   int outstanding; // how many FS sys calls are executing.
   int committing;  // in commit(), please wait.
   int dev;
@@ -51,6 +64,11 @@ struct log log;
 static void recover_from_log(void);
 static void commit();
 
+
+// 文件系统需要被初始化，具体来说，需要从磁盘读取一些数据来确保文件系统的运行，比如说文件系统究竟有多大，
+// 各种各样的东西在文件系统的哪个位置，同时还需要有crash recovery log。完成任何文件系统的操作都需要等待磁盘操作结束
+// 但是XV6只能在用户进程的context下执行文件系统操作，那我们就在第一个用户进程开始执行前进行fsinit(-->initlog)
+// main() --> 第一个用户进程开始执行userinit() --> forkret() --> fsinit() --> initlog()
 void
 initlog(int dev, struct superblock *sb)
 {
@@ -61,9 +79,10 @@ initlog(int dev, struct superblock *sb)
   log.start = sb->logstart;
   log.size = sb->nlog;
   log.dev = dev;
-  recover_from_log();
+  recover_from_log();   // 文件系统初始化时
 }
 
+// 将在log域在一次事务中缓存的要写入data block的数据写入到disk上真正想写入的data block中的响应位置(home locations)
 // Copy committed blocks from log to their home location
 static void
 install_trans(void)
@@ -72,9 +91,9 @@ install_trans(void)
 
   for (tail = 0; tail < log.lh.n; tail++) {
     struct buf *lbuf = bread(log.dev, log.start+tail+1); // read log block
-    struct buf *dbuf = bread(log.dev, log.lh.block[tail]); // read dst
-    memmove(dbuf->data, lbuf->data, BSIZE);  // copy block to dst
-    bwrite(dbuf);  // write dst to disk
+    struct buf *dbuf = bread(log.dev, log.lh.block[tail]); // read dst 读取修改过data block的块号对应的块到内存(用buf表示
+    memmove(dbuf->data, lbuf->data, BSIZE);  // copy block to dst (log域缓存的写块复制到 原本要写的data block在内存中内对应的struct buf)
+    bwrite(dbuf);  // write dst to disk 将data block在内存中的映射写入disk上的data block
     bunpin(dbuf);
     brelse(lbuf);
     brelse(dbuf);
@@ -95,6 +114,7 @@ read_head(void)
   brelse(buf);
 }
 
+// 将header块写到磁盘上，就表明已提交，为提交点，写完日志后的崩溃，会导致在重启后重新执行日志
 // Write in-memory log header to disk.
 // This is the true point at which the
 // current transaction commits.
@@ -104,7 +124,8 @@ write_head(void)
   struct buf *buf = bread(log.dev, log.start);
   struct logheader *hb = (struct logheader *) (buf->data);
   int i;
-  hb->n = log.lh.n;
+  hb->n = log.lh.n;   // 在commit()中已完成实际data block写入后将该值置为0表示事务完成这里写入disk也写入0
+                      // 这必须在下一个事务开始之前修改，这样崩溃就不会导致重启后的恢复使用这次的header和下次的日志块
   for (i = 0; i < log.lh.n; i++) {
     hb->block[i] = log.lh.block[i];
   }
@@ -117,8 +138,8 @@ recover_from_log(void)
 {
   read_head();
   install_trans(); // if committed, copy from log to disk
-  log.lh.n = 0;
-  write_head(); // clear the log
+  log.lh.n = 0; // 未写入data block的block数
+  write_head(); // clear the old log and create the new log
 }
 
 // called at the start of each FS system call.
@@ -127,12 +148,13 @@ begin_op(void)
 {
   acquire(&log.lock);
   while(1){
-    if(log.committing){
+    if(log.committing){     // 等待正在被commit中进行睡眠
       sleep(&log, &log.lock);
-    } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > LOGSIZE){
+    } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > LOGSIZE){  // 没有足够的日志空间用来容纳日志时会等待有充足空间再进行
+      // 假设每次系统调用最多写入MAXOPBLOCKS个块
       // this op might exhaust log space; wait for commit.
       sleep(&log, &log.lock);
-    } else {
+    } else {  // 可以将多个系统调用的写操作封装在一个事务中
       log.outstanding += 1;
       release(&log.lock);
       break;
@@ -165,7 +187,7 @@ end_op(void)
   if(do_commit){
     // call commit w/o holding locks, since not allowed
     // to sleep with locks.
-    commit();
+    commit();     // 在结束fs写系统调用时进行一次提交，具体是否会写入disk要看同一事务下其他的系统调用是否结束，防止造成将一个系统调用的多个写分散到不同的事务中
     acquire(&log.lock);
     log.committing = 0;
     wakeup(&log);
@@ -173,7 +195,7 @@ end_op(void)
   }
 }
 
-// Copy modified blocks from cache to log.
+// Copy modified blocks from cache to log. 将事务中修改的每个块从buffer缓存中复制到磁盘上的日志槽中(log域中缓存一次事务写的data block的数据)
 static void
 write_log(void)
 {
@@ -181,7 +203,7 @@ write_log(void)
 
   for (tail = 0; tail < log.lh.n; tail++) {
     struct buf *to = bread(log.dev, log.start+tail+1); // log block
-    struct buf *from = bread(log.dev, log.lh.block[tail]); // cache block
+    struct buf *from = bread(log.dev, log.lh.block[tail]); // cache block (log.lh.block[tail]是块号，bread通过块号找到块的封装buf)
     memmove(to->data, from->data, BSIZE);
     bwrite(to);  // write the log
     brelse(from);
@@ -201,7 +223,7 @@ commit()
   }
 }
 
-// Caller has modified b->data and is done with the buffer.
+// Caller(Program) has modified b->data and is done with the buffer.
 // Record the block number and pin in the cache by increasing refcnt.
 // commit()/write_log() will do the disk write.
 //
@@ -222,10 +244,10 @@ log_write(struct buf *b)
 
   acquire(&log.lock);
   for (i = 0; i < log.lh.n; i++) {
-    if (log.lh.block[i] == b->blockno)   // log absorbtion
+    if (log.lh.block[i] == b->blockno)   // log absorbtion 一次事务的多次写都是对同一块进行写，那就将这多次合并成一次节省日志空间
       break;
   }
-  log.lh.block[i] = b->blockno;
+  log.lh.block[i] = b->blockno;     // 一次事务中对哪些data block写了需要将其块号写入到日志的header的扇区号数组
   if (i == log.lh.n) {  // Add new block to log?
     bpin(b);
     log.lh.n++;

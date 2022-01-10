@@ -4,7 +4,7 @@ struct buf {
   uint dev;    // which device own the block?
   uint blockno;   // which block does the buffer cache?
   struct sleeplock lock;  // protects reads and writes of the block's buffered content
-  uint refcnt;
+  uint refcnt;      // 尚未释放buffer的processes
   struct buf *prev; // LRU cache list
   struct buf *next;
   uchar data[BSIZE];
