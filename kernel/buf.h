@@ -10,3 +10,14 @@ struct buf {
   uchar data[BSIZE];
 };
 
+
+/**
+ * Why sleeplock? Why not spinlock?
+ * 1. It takes a lot of time to process I/O operations.
+ * 2. Spinlock has many restrictions.
+ *    e.g. locking the spinlock requires turning off interrupt on the current locking CPU core.
+ *         We can't receive data from the disk anymore if we have only one core.
+ *         (Data transforms by interrupts.)
+ * 3. Sleeplock won't require to turn off interrupt when acquiring the sleeplock.
+ * 4. Sleeplock is sleeping and gives up the CPU when acquiring the sleeplock. Spinlock works with busy-loop.
+ */
