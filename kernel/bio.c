@@ -36,11 +36,11 @@
 // 这时就选出访问次数较少的buffer将其位置占用替换成新内容。
 
 // xv6实现的buffer cache的双向循环链表中，每个节点作为可被分配的buffer资源，位置不同，表示不同的访问热度，
-// 按照一定的规则(LRU)在选出新的空闲的buffer节点场景下，最进被所有线程操作结束很可能再次有线程来访问的放在链表靠前位置，
-// 已经被所有线程操作并释放完很久的buffer节点位于链表的末端，这就是我们选择新buffer供予新disk数据分配的目标。
+// 按照一定的规则(LRU)在选出新的空闲的buffer节点场景下，最近被线程操作结束很可能再次有线程来访问的放在链表靠前位置，
+// 已经被线程操作并释放完很久的buffer节点位于链表的末端，这就是我们选择新buffer供予新disk数据分配的目标。
 
 struct {
-  struct spinlock lock;   // protects `information`(not buffer content) about which blocks are cached
+  struct spinlock lock;   // protects `information`(not buffer content) which blocks are cached
   struct buf buf[NBUF];
 
   // Linked list of all buffers, through prev/next.
