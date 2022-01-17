@@ -129,15 +129,16 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 };
 
+// 用户进程通过ecall传入a7寄存器系统调用号进入内核trap trap根据进入内核原因在trap中调用syscall处理系统调用
 void
 syscall(void)
 {
   int num;
   struct proc *p = myproc();
 
-  num = p->trapframe->a7;
+  num = p->trapframe->a7;   // 系统调用号
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    p->trapframe->a0 = syscalls[num]();
+    p->trapframe->a0 = syscalls[num]();     // 执行对应系统调用函数 a0记录系统调用返回值
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);
