@@ -370,14 +370,20 @@ iunlockput(struct inode *ip)
   iput(ip);
 }
 
-// Inode content
+// Inode content -- 根据inode中索引号找到实际数据块号
 //
 // The content (data) associated with each inode is stored
 // in blocks on the disk. The first NDIRECT block numbers
 // are listed in ip->addrs[].  The next NINDIRECT blocks are
 // listed in block ip->addrs[NDIRECT].
 
-// Return the disk block address of the nth block in inode ip.
+// bmap给定一个文件的inode中存真实数据block number的索引号
+// 虽然说是只有十三个uint索引，但我们查找时实际上是将所有的一级间接块上索引
+// 全部展开形成线性的索引表，一共是12个直接索引 + (1*blocksize_BSIZE/4)个间接索引
+// 假如说bn == 201，那么说明我们要查找间接索引里的第201-12即第189个指向实际数据块
+// 索引中的数据块号
+
+// Return the disk (data) block address of the nth block in inode ip.
 // If there is no such block, bmap allocates one.
 static uint
 bmap(struct inode *ip, uint bn)
@@ -385,21 +391,23 @@ bmap(struct inode *ip, uint bn)
   uint addr, *a;
   struct buf *bp;
 
+  // direct block number
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
-      ip->addrs[bn] = addr = balloc(ip->dev);
+      ip->addrs[bn] = addr = balloc(ip->dev);   // allocate a data block
     return addr;
   }
   bn -= NDIRECT;
 
+  // singly-indirect block number
   if(bn < NINDIRECT){
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
-      ip->addrs[NDIRECT] = addr = balloc(ip->dev);
+      ip->addrs[NDIRECT] = addr = balloc(ip->dev);    // allocate a indirect block block
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
     if((addr = a[bn]) == 0){
-      a[bn] = addr = balloc(ip->dev);
+      a[bn] = addr = balloc(ip->dev);   // allocate a data block
       log_write(bp);
     }
     brelse(bp);
