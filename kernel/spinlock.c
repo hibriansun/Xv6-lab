@@ -39,6 +39,7 @@ acquire(struct spinlock *lk)
   // __sync_lock_test_and_set wrap the amoswap instruction and returning the old value the register it written
 
   // 对于synchronize指令，任何在它之前的load/store指令，都不能移动到它之后
+  // TEST_AND_SET: 将新值设定到变量上并返回变量旧值
   while(__sync_lock_test_and_set(&lk->locked, 1) != 0)      // 实现自旋 与 原子占用操作
     ;
 
