@@ -13,6 +13,23 @@
 #include "stat.h"
 #include "proc.h"
 
+struct logheader {
+  int n;   // counter: 修改的struct buf块数(未写入disk上data block的block数 在commit后置0)
+  int block[LOGSIZE];  // 修改的struct buf块对应的扇区号数组
+};
+
+struct log {
+  struct spinlock lock;
+  int start;       // logstart
+  int size;        // Number of log blocks (struct superlog.nlog)
+  int outstanding; // how many FS sys calls are executing.
+  int committing;  // in commit(), please wait.
+  int dev;
+  struct logheader lh;
+};
+
+extern struct log log;
+
 struct devsw devsw[NDEV];
 struct {
   struct spinlock lock;
@@ -152,6 +169,11 @@ filewrite(struct file *f, uint64 addr, int n)
     // and 2 blocks of slop for non-aligned writes.
     // this really belongs lower down, since writei()
     // might be writing a device like the console.
+
+    // 我们不能保证write系统调用是原子性的尽管MIT6.S081课上说是
+    // https://mit-public-courses-cn-translatio.gitbook.io/mit6-s081/lec15-crash-recovery-frans/15.3-file-system-logging
+    // 这里如果对一个文件的写内容大于一定程度会分多次写
+    // begin_op和end_op标志着一个事务的开始与结束
     int max = ((MAXOPBLOCKS-1-1-2) / 2) * BSIZE;
     int i = 0;
     while(i < n){
@@ -166,11 +188,15 @@ filewrite(struct file *f, uint64 addr, int n)
       iunlock(f->ip);
       end_op();
 
+      printf("%d ", log.outstanding);
+
       if(r < 0)
         break;
       if(r != n1)
         panic("short filewrite");
       i += r;
+
+      // break;  // crash happend here after the first loop
     }
     ret = (i == n ? n : -1);
   } else {
