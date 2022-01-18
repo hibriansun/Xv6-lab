@@ -6,6 +6,22 @@
 #include "proc.h"
 #include "defs.h"
 
+/**
+ * RISC-V中：
+ * Trap包含Interrupt, Exception
+ *  
+ * Interrupt：an external asynchronous event that may cause a RISC-V hart to 
+ *            experience an unexpected transfer of control
+ * 
+ * Exception： an unusual condition occurring at run time associated with
+ *             an instruction in the current RISC-V hart
+ * 
+ * Xv6中所谓的关中断(intr_off)实际上是关的Interrupt(Software && Hardware external)，
+ * 然而异常是关不掉的，在内核中发生异常是要进Kernel Trap去处理的，例如page fault，除零操作，系统调用
+ * 这种异常
+ * 
+ */
+
 // 对时钟计数tick的竞争保护，tick可能在时钟中断clockintr改写也可能在sys_sleep中读取
 struct spinlock tickslock;
 uint ticks;
