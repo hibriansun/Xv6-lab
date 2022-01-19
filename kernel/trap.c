@@ -3,8 +3,13 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "sleeplock.h"
+#include "mmap.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
+#include "fs.h"
+#include "file.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -67,12 +72,58 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if (r_scause() == 13 || r_scause() == 15) {    // Page Fault Handler for load && store access fault
+    // printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    // printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    // lazy allocation for mmap inn this lab
+    // printf("%p\n", p->next_free_vmaddr);
+    if (r_stval() > TRAPFRAME || r_stval() < p->next_free_vmaddr) {
+      p->killed = 1;
+      goto kill;
+    }
+
+    int i;
+    for (i = 0; i < NVMA; i++) {
+      if (p->vma_set[i].occupied && r_stval() >= p->vma_set[i].vm_start 
+          && r_stval() < p->vma_set[i].vm_start+p->vma_set[i].vm_length) {
+            // modify the accessibilities of PTEs
+            int perm = PTE_U;
+            if (p->vma_set[i].vm_page_prot & PROT_READ) perm |= PTE_R;
+            if (p->vma_set[i].vm_page_prot & PROT_WRITE) perm |= PTE_W;
+
+            // Create PTEs and allocate a new page for lazy allocation.
+            uint64 oldsz = PGROUNDDOWN(r_stval());
+            uint64 mem = (uint64)kalloc();
+            if(mem == 0){
+              uvmdealloc(p->pagetable, oldsz, r_stval());
+              p->killed = 1;      // Out of Memory (没有物理内存可供分配了，这里还有更巧妙处理方法，例如clock、LRU算法来evict pages)
+              goto kill;
+            }
+            memset((void*)mem, 0, PGSIZE);
+            
+            // Map physical memory to the user virtual memory
+            if(mappages(p->pagetable, oldsz, PGSIZE, (uint64)mem, perm) != 0){
+              kfree((void*)mem);
+              uvmdealloc(p->pagetable, oldsz, r_stval());
+              panic("page faults handler falut");
+            }
+
+            // Read data from the file to really mmap
+            begin_op();
+            ilock(p->vma_set[i].vm_file->ip);
+            readi(p->vma_set[i].vm_file->ip, 0, mem, oldsz-p->vma_set[i].vm_start, PGSIZE);
+            iunlock(p->vma_set[i].vm_file->ip);
+            end_op();
+      }
+    }
+    printf("Mmap Trap Done!\n");
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
   }
 
+kill:
   if(p->killed)
     exit(-1);
 

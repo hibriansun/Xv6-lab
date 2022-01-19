@@ -3,8 +3,10 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "mmap.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -146,8 +148,11 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+  // printf("%p\n", p->next_free_vmaddr);
+  // printf("%p\n", TRAPFRAME);
   if(p->pagetable)
-    proc_freepagetable(p->pagetable, p->sz);
+    proc_freepagetable(p->pagetable, p->sz, p->next_free_vmaddr);
+  p->next_free_vmaddr = TRAPFRAME;
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -195,10 +200,14 @@ proc_pagetable(struct proc *p)
 // Free a process's page table, and free the
 // physical memory it refers to.
 void
-proc_freepagetable(pagetable_t pagetable, uint64 sz)
+proc_freepagetable(pagetable_t pagetable, uint64 sz, uint64 next_free_vmaddr)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  if (next_free_vmaddr != TRAPFRAME) {
+    // printf("Enter\n");
+    mmap_uvmunmap(pagetable, next_free_vmaddr, (TRAPFRAME-next_free_vmaddr)/PGSIZE, 1);
+  }
   uvmfree(pagetable, sz);
 }
 
@@ -236,6 +245,8 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+
+  p->next_free_vmaddr = TRAPFRAME;
 
   release(&p->lock);
 }
@@ -300,6 +311,32 @@ fork(void)
 
   pid = np->pid;
 
+  // printf("%p should equals %p\n", p->next_free_vmaddr, TRAPFRAME);
+
+  np->next_free_vmaddr = p->next_free_vmaddr;
+
+  if (mmapcopy(p->pagetable, np->pagetable, p->next_free_vmaddr) < 0){
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
+
+  for (int i = 0; i < NVMA; i++) {
+    if (p->vma_set[i].occupied) {
+      np->vma_set[i] = p->vma_set[i];
+      // copy parent's user mmap memory to the child when parent is MAP_PRIVATE
+      // if(p->vma_set[i].vm_flags == MAP_PRIVATE) {
+        // if (mmapcopy(p->pagetable, np->pagetable, p->vma_set[i].vm_start, p->vma_set[i].vm_length) < 0){
+        //   freeproc(np);
+        //   release(&np->lock);
+        //   return -1;
+        // }
+        filedup(np->vma_set[i].vm_file);
+      // }
+    }
+  }
+
+
   np->state = RUNNABLE;
 
   release(&np->lock);
@@ -351,6 +388,10 @@ exit(int status)
       fileclose(f);
       p->ofile[fd] = 0;
     }
+  }
+
+  for (int i = 0; i < NVMA; i++) {
+    p->vma_set[i].occupied = 0;
   }
 
   begin_op();

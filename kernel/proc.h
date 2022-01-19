@@ -103,4 +103,18 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  /* 
+   * Keep track of what mmap has mapped for each process
+   * Since the xv6 kernel doesn't have a memory allocator in the kernel, 
+   * it's OK to declare a fixed-size array of VMAs and allocate from that 
+   * array as needed. A size of 16 should be sufficient.
+   */
+  struct vm_area_struct vma_set[NVMA];
+
+  /* 
+   * The mmap area grows from TRAPFRAME downwards toward p->sz.
+   * Internel area of a VMA is growing from bottom to top.
+   */
+  uint64 next_free_vmaddr;
 };

@@ -11,6 +11,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "stat.h"
+#include "mmap.h"
 #include "proc.h"
 
 struct devsw devsw[NDEV];
@@ -51,6 +52,19 @@ filedup(struct file *f)
   if(f->ref < 1)
     panic("filedup");
   f->ref++;
+  release(&ftable.lock);
+  return f;
+}
+
+// Decrement ref count for file f.
+struct file*
+fileundup(struct file *f)
+{
+  acquire(&ftable.lock);
+  if(f->ref < 1)
+    panic("filedup");
+  f->ref--;
+
   release(&ftable.lock);
   return f;
 }
