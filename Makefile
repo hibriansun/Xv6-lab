@@ -35,13 +35,15 @@ OBJS = \
   $K/sysfile.o \
   $K/kernelvec.o \
   $K/plic.o \
-  $K/virtio_disk.o
+  $K/virtio_disk.o\
+  $K/semaphore.o 
 
 ifeq ($(LAB),pgtbl)
 OBJS += \
 	$K/vmcopyin.o
 endif
 
+# 等价于 if (LAB == pgtbl || LAB == lock)
 ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
 OBJS += \
 	$K/stats.o\
