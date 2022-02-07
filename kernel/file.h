@@ -17,7 +17,7 @@ struct file {
 struct inode {
   uint dev;           // Device number
   uint inum;          // Inode number
-  int ref;            // Reference count
+  int ref;            // C pointer reference count (一个inode的ref如果大于0，则会使系统将该inode保留在icache缓存中，而不会重用该inode)
   struct sleeplock lock; // protects everything below here
   int valid;          // inode has been read from disk?
 

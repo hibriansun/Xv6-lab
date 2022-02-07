@@ -171,8 +171,9 @@ bfree(int dev, uint b)
 // dev, and inum.  One must hold ip->lock in order to
 // read or write that inode's ip->valid, ip->size, ip->type, &c.
 
+// 主要工作其实是同步多个进程的访问，缓存是次要的
 struct {
-  struct spinlock lock;
+  struct spinlock lock;  // icache.lock保证了一个inode在缓存只有一个副本，以及缓存inode的ref字段计数正确
   struct inode inode[NINODE];
 } icache;
 
@@ -189,6 +190,8 @@ iinit()
 
 static struct inode* iget(uint dev, uint inum);
 
+// 创建一个新文件时分配inode
+// 由于一次只能有一个进程持有对bp的引用，ialloc可以确保其他进程不会同时看到inode是可用的并使用它
 // Allocate an inode on device dev.
 // Mark it as allocated by  giving it type type.
 // Returns an unlocked but allocated and referenced inode.
@@ -236,6 +239,7 @@ iupdate(struct inode *ip)
   brelse(bp);
 }
 
+// 在inode cache中寻找一个带有所需设备号和inode号码的active条目
 // Find the inode with number inum on device dev
 // and return the in-memory copy. Does not lock
 // the inode and does not read it from disk.
@@ -283,6 +287,7 @@ idup(struct inode *ip)
   return ip;
 }
 
+// 在读写inode的元数据或内容之前，代码必须使用ilock锁定它
 // Lock the given inode.
 // Reads the inode from disk if necessary.
 void
