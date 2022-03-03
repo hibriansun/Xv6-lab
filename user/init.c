@@ -41,6 +41,9 @@ main(void)
       exit(1);
     }
 
+    // Linux在处理第一个系统创建的线程是在执行万相关内核任务后让该线程进入idle调度类
+    // Xv6的做法是在一个infinity loop中等待子进程shell退出 一旦退出重新建立一个shell进程
+    // 这样我们就可以通过子进程进入到了shell，用其执行其他程序了
     for(;;){
       // this call to wait() returns if the shell exits,
       // or if a parentless process exits.

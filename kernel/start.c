@@ -18,12 +18,15 @@ uint64 mscratch0[NCPU * 32];
 extern void timervec();
 
 // entry.S jumps here in machine mode on stack0.
-// 这里将所有的中断都设置在Supervisor mode，然后设置SIE寄存器来接收External，软件和定时器中断，之后初始化定时器。
+// 每个CPU启动后都要从entry.S进来这里设置
+// 这里将所有的Trap(interrupts && exceptions)都设置在Supervisor mode，然后设置SIE寄存器
+// 来接收External，软件和定时器中断，之后初始化定时器。
 void
 start()
 {
   // set M Previous Privilege mode to Supervisor, for mret.
-  unsigned long x = r_mstatus();    // sstatus寄存器中有一个bit来打开或者关闭中断。每一个CPU核都有独立的SIE和SSTATUS寄存器，除了通过SIE寄存器来单独控制特定的中断，还可以通过SSTATUS寄存器中的一个bit来控制所有的中断。
+  unsigned long x = r_mstatus();    // sstatus寄存器中有一个bit来打开或者关闭中断。每一个CPU核都有独立的SIE和SSTATUS寄存器，
+                                    // 除了通过SIE寄存器来单独控制特定的中断，还可以通过SSTATUS寄存器中的一个bit来控制所有的中断。
   x &= ~MSTATUS_MPP_MASK;
   x |= MSTATUS_MPP_S;
   w_mstatus(x);

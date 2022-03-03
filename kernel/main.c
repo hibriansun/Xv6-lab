@@ -28,7 +28,7 @@ main()
     iinit();         // inode cache
     fileinit();      // file table
     virtio_disk_init(); // emulated hard disk
-    userinit();      // first user process
+    userinit();      // first user process [P.S. 只有CPU hartid为0的hart执行userinit]
     __sync_synchronize();
     started = 1;
   } else {           // 第2 3...核心走这里
