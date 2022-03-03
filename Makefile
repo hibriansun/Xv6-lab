@@ -112,6 +112,13 @@ endif
 
 LDFLAGS = -z max-page-size=4096
 
+# make 单个指令一执行 就会主动在Makefile中寻找第一个Target作为默认目标
+# 这里就是一个Target
+# 这里利用了Makefile中的自动推导，只要 make 看到一个 .o 文件，它就会自动的把 .c 文件加在依赖关系中，且会自己推导编译命令
+# 如果 make 找到一个whatever.o ，那么 whatever.c 就会是 whatever.o 的依赖文件。并且 cc -c whatever.c 也会被推导出来
+# (推导说明详见：《跟我一起写Makefile》-- 陈皓 第2.5节)
+# 这里就是make看到了一堆OBJS .o文件，就会将对对应.c文件找到，并写入推导编译.c成.o文件的命令
+# kernel依赖于生成kernel可执行文件的kernel目标文件们的链接脚本 和 第一个用户态程序initcode.S(_initcode执行exec("user/init.c"))
 $K/kernel: $(OBJS) $K/kernel.ld $U/initcode
 	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) 
 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
@@ -242,7 +249,7 @@ ifeq ($(LAB),util)
 	UEXTRA += user/xargstest.sh
 endif
 
-
+# 将所有用户程序可执行文件写入到该文件镜像在qemu启动时被挂载为硬盘
 fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
 	mkfs/mkfs fs.img README $(UEXTRA) $(UPROGS)
 
@@ -280,6 +287,8 @@ QEMUOPTS += -netdev user,id=net0,hostfwd=udp::$(FWDPORT)-:2000 -object filter-du
 QEMUOPTS += -device e1000,netdev=net0,bus=pcie.0
 endif
 
+# make qemu指令匹配到这里
+# qemu label依赖于kernel/kernel可执行文件 和 fs.img
 qemu: $K/kernel fs.img
 	$(QEMU) $(QEMUOPTS)
 
