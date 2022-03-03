@@ -250,8 +250,8 @@ ifeq ($(LAB),util)
 endif
 
 # 将所有用户程序可执行文件写入到该文件镜像在qemu启动时被挂载为硬盘
-fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
-	mkfs/mkfs fs.img README $(UEXTRA) $(UPROGS)
+fs.img: mkfs/mkfs README.md $(UEXTRA) $(UPROGS)
+	mkfs/mkfs fs.img README.md $(UEXTRA) $(UPROGS)
 
 -include kernel/*.d user/*.d
 
