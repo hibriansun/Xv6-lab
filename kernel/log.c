@@ -7,16 +7,8 @@
 #include "fs.h"
 #include "buf.h"
 
-/**
- 对于进程的写操作，Xv6是这样做的：
- 一个syscall记录所有的写操作成一个日志，当所有的写操作被打包记录成一个日志时，内核向disk写一个特殊的commit，表示该日志为complete状态(所有写操作记录完成)
- 之后这个syscall再去将所有要真正写入的数据copy至disk
- 当写操作完成，syscall还会清除该log
- 
- <所以说当一个日志所属的所有写操作真正完成后，日志应该是不见了的，如果crash后日志还在，并标明complete说明那一连串原子
- 性的写操作失败，还是会恢复写操作保证其成功，但如果日志都没有标记complete标志说明日志不完整，那么将被recovery code忽略，这些写操作丢失>
- <commit是标志，commit之前生成的日志是没有complete标记，无法被恢复写操作，commit后的日志有complete标记 可以被恢复> 
- */
+// Log详述：
+// https://www.notion.so/briansun/Xv6-cd6c4e1350154a0f8451978e3f7b7ca4
 
 
 // Simple logging that allows concurrent FS system calls.
@@ -47,7 +39,7 @@
 // and to keep track in memory of logged block# before commit.
 struct logheader {
   int n;   // counter: 修改的struct buf块数(未写入disk上data block的block数 在commit后置0)
-  int block[LOGSIZE];  // 修改的struct buf块对应的扇区号数组
+  int block[LOGSIZE];  // 修改的struct buf块对应的扇区号数组，从bcache中拿出来使用
 };
 
 struct log {
@@ -124,7 +116,7 @@ write_head(void)
   struct buf *buf = bread(log.dev, log.start);
   struct logheader *hb = (struct logheader *) (buf->data);
   int i;
-  hb->n = log.lh.n;   // 在commit()中已完成实际data block写入后将该值置为0表示事务完成这里写入disk也写入0
+  hb->n = log.lh.n;   // 在commit()中已完成实际data block写入后将该值置为0表示事务完成 这里写入disk也写入0
                       // 这必须在下一个事务开始之前修改，这样崩溃就不会导致重启后的恢复使用这次的header和下次的日志块
   for (i = 0; i < log.lh.n; i++) {
     hb->block[i] = log.lh.block[i];
@@ -155,7 +147,7 @@ begin_op(void)
       // this op might exhaust log space; wait for commit.
       sleep(&log, &log.lock);
     } else {  // 可以将多个系统调用的写操作封装在一个事务中
-      log.outstanding += 1;
+      log.outstanding += 1; // 在本次commit中，多一个事务(内核线程)，并且该事务占有该commit中，别开始commit提交
       release(&log.lock);
       break;
     }
@@ -205,7 +197,7 @@ write_log(void)
     struct buf *to = bread(log.dev, log.start+tail+1); // log block
     struct buf *from = bread(log.dev, log.lh.block[tail]); // cache block (log.lh.block[tail]是块号，bread通过块号找到块的封装buf)
     memmove(to->data, from->data, BSIZE);
-    bwrite(to);  // write the log
+    bwrite(to);  // write the log to the **DISK**
     brelse(from);
     brelse(to);
   }

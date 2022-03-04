@@ -41,6 +41,7 @@
 
 struct {
   struct spinlock lock;   // protects `information`(not buffer content) which blocks are cached
+                          // 例如我们要从buffer cache中选一个struct buf出来放data block (bget())，那么需要要在此期间加锁保证操作原子性
   struct buf buf[NBUF];
 
   // Linked list of all buffers, through prev/next.
@@ -81,7 +82,8 @@ bget(uint dev, uint blockno)
   // Is the block already cached?
   for(b = bcache.head.next; b != &bcache.head; b = b->next){
     if(b->dev == dev && b->blockno == blockno){
-      b->refcnt++;
+      b->refcnt++;      // ensure that no more one data block occupies the struct buf 
+                        // after one data block chose and releasing bcache.lock
       release(&bcache.lock);
       acquiresleep(&b->lock);
       return b;
@@ -91,7 +93,8 @@ bget(uint dev, uint blockno)
   // Not cached.
   // Recycle the least recently used (LRU) unused buffer.
   for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
-    if(b->refcnt == 0) {
+    if(b->refcnt == 0) {     // ensure that no more one data block occupies the struct buf 
+                             // after one data block chose and releasing bcache.lock
       b->dev = dev;
       b->blockno = blockno;
       b->valid = 0;          // data will be reload from disk when vaild == 0

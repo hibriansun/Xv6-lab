@@ -51,7 +51,7 @@ filealloc(void)
   acquire(&ftable.lock);
   for(f = ftable.file; f < ftable.file + NFILE; f++){
     if(f->ref == 0){
-      f->ref = 1;
+      f->ref = 1;   // 可以通过fork dup增加
       release(&ftable.lock);
       return f;
     }
@@ -152,6 +152,11 @@ int
 filewrite(struct file *f, uint64 addr, int n)
 {
   int r, ret = 0;
+  // if (intr_get()) {
+  //   printf("Intr_on\n");
+  // } else {
+  //   printf("Intr_off\n");
+  // }
 
   if(f->writable == 0)
     return -1;
@@ -196,7 +201,6 @@ filewrite(struct file *f, uint64 addr, int n)
         panic("short filewrite");
       i += r;
 
-      // break;  // crash happend here after the first loop
     }
     ret = (i == n ? n : -1);
   } else {
