@@ -8,7 +8,7 @@ _entry:
         # stack0 is declared in start.c,
         # with a 4096-byte stack per CPU.
         # sp = stack0 + (hartid * 4096)
-        # 为每个CPU设置stack，例如供每个CPU上的调度内核线程使用
+        # 为每个CPU设置stack，例如供每个CPU上的调度内核线程使用(这个栈供以后CPU调度代码使用)
         la sp, stack0           # la: load absolute address -- sp = stack0
         li a0, 1024*4           # li: load immediate number -- a0 = 1024*4
 	csrr a1, mhartid        # csrr: csr read -- a1 = mhartid

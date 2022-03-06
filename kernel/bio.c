@@ -110,6 +110,7 @@ bget(uint dev, uint blockno)
   panic("bget: no buffers");
 }
 
+// bread使用睡眠锁
 // Return a `locked` buf with the contents of the indicated block.
 struct buf*
 bread(uint dev, uint blockno)

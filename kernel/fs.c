@@ -672,6 +672,7 @@ namex(char *path, int nameiparent, char *name)
   return ip;
 }
 
+// 根据路径名找出对应文件inode
 struct inode*
 namei(char *path)
 {

@@ -22,7 +22,7 @@ static void freeproc(struct proc *p);
 extern char trampoline[]; // trampoline.S
 
 // initialize the proc table at boot time.
-// 初始化"每个CPU上正在跑的进程记录表"
+// 初始化"所有进程PCB"
 // 初始化锁、分配进程的内核栈
 void
 procinit(void)
@@ -469,6 +469,7 @@ wait(uint64 addr)
 }
 
 // Per-CPU process scheduler. (每个CPU都有一个Scheduler，每个CPU遍历所有进程调度)
+// struct cpu提供了每隔调度器进程运行的状态上下文(寄存器) 当跳转到scheduler的时候执行C代码是在machine mode的start.c中定义的stack0(per-CPU的内核栈)
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
 //  - choose a process to run.
