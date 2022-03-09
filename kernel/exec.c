@@ -23,18 +23,22 @@ exec(char *path, char **argv)
 
   begin_op();
 
+  // 获取可执行文件inode
+
   if((ip = namei(path)) == 0){
     end_op();
     return -1;
   }
   ilock(ip);
 
+  // 检查ELF文件合法性
   // Check ELF header
   if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;
   if(elf.magic != ELF_MAGIC)
     goto bad;
 
+  // 给进程分配一个仅map trampoline and trapframe的页表
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
 
@@ -66,16 +70,19 @@ exec(char *path, char **argv)
 
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
+  // 两个PGSIZE大小 一个用作guard page(防止stack overflow伤及其他区域) 一个用于用户栈()
   sz = PGROUNDUP(sz);
   uint64 sz1;
   if((sz1 = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
   sz = sz1;
-  uvmclear(pagetable, sz-2*PGSIZE);
+  uvmclear(pagetable, sz-2*PGSIZE); // 栈和guard page标记为非法
   sp = sz;
-  stackbase = sp - PGSIZE;
+  stackbase = sp - PGSIZE;  // 栈顶
 
   // Push argument strings, prepare rest of stack in ustack.
+  // exec 参数复制到栈中并随后记录参数地址到全部参数后
+  // 栈向低地址增长
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
       goto bad;
@@ -111,10 +118,10 @@ exec(char *path, char **argv)
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
-  p->sz = sz;
-  p->trapframe->epc = elf.entry;  // initial program counter = main
-  p->trapframe->sp = sp; // initial stack pointer
-  proc_freepagetable(oldpagetable, oldsz);
+  p->sz = sz;   // 进程exec后用户空间(不计算trapframe and trampoline)初始大小为栈底地址值
+  p->trapframe->epc = elf.entry;  // initial program counter = main       // 用户态PC(用户态program counter 指向正在执行的指令)
+  p->trapframe->sp = sp; // initial stack pointer     // 在args参数之后
+  proc_freepagetable(oldpagetable, oldsz);            // fork旧进程复制过来的虚拟地址空间被释放
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 

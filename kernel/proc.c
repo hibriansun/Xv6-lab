@@ -24,6 +24,8 @@ extern char trampoline[]; // trampoline.S
 // initialize the proc table at boot time.
 // 初始化"所有进程PCB"
 // 初始化锁、分配进程的内核栈
+// 内核栈是当用户进程从用户态因为trap执行到内核态时执行trap等'内核'C函数 and ASM使用的栈空间
+// 存放local var、return address等信息
 void
 procinit(void)
 {
@@ -106,6 +108,7 @@ allocproc(void)
   }
   return 0;
 
+// 要在found这里填充内核管理进程的PCB信息
 found:
   p->pid = allocpid();
 
@@ -179,6 +182,8 @@ proc_pagetable(struct proc *p)
   }
 
   // map the trapframe just below TRAMPOLINE, for trampoline.S.
+  // 如果是exec trapframe在进程fork时已经在内核kalloc了trapframe page 这个page内核地址是p->trapframe值
+  // 因此不用在exec时free掉重新kalloc再映射
   if(mappages(pagetable, TRAPFRAME, PGSIZE,
               (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
     uvmunmap(pagetable, TRAMPOLINE, 1, 0);

@@ -1,6 +1,6 @@
 // Format of an ELF executable file
-
-#define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
+// 一个ELF二进制文件以四个字节的"魔法数字": 0x7F、'E'、'L'、'F'(即ELF_MAGIC)开始
+#define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian 
 
 // File header
 struct elfhdr {
