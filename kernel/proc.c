@@ -304,7 +304,7 @@ fork(void)
 
   pid = np->pid;
 
-  np->state = RUNNABLE;
+  np->state = RUNNABLE;   // 等待被调度
 
   release(&np->lock);
 
@@ -390,6 +390,10 @@ exit(int status)
   // to a dead or wrong process; proc structs are never re-allocated
   // as anything else.
   // 处理罕见情况：该进程和该进程的父进程可能同时退出
+  // 如果说父子进程同时退出，那么就是在同时执行本函数，关于他俩的PCB数据结构一定会产生race condition
+  // 父进程退出时会调用reparent 子进程p->parent就成了竞争资源
+  // 如果父进程抢先执行reparent改变子进程p->parent为initproc那在子进程后面加锁解锁p->parent->lock那值就不一样
+  // 因此我们要在这里用临时变量记录一下
   acquire(&p->lock);
   struct proc *original_parent = p->parent;
   release(&p->lock);
@@ -404,6 +408,10 @@ exit(int status)
   reparent(p);
 
   // Parent 'might be' sleeping in wait().
+  // 不能唤醒ZOMBIE态进程
+  // 父进程可能抢先持有自己锁并执行到sched(释放自身锁)调度其他进程运行 那也没事
+  // 子进程被唤醒后如果之前original_parent记录的是原本父进程那也没关系
+  // 执行到这里唤醒原本父进程 原本父进程是ZOMBIE了也无法被唤醒了 跳过这步就好
   wakeup1(original_parent);
 
   p->xstate = status;
@@ -420,6 +428,7 @@ exit(int status)
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
+// initproc or 其他调用wait的进程 一有机会被调度执行就会在wait里loop检测哪个进程为ZOMIE全部给他们清理干净了
 // 每个退出exit的进程都有来自父进程的wait
 int
 wait(uint64 addr)
@@ -481,6 +490,11 @@ wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+// 关于scheduler的锁：
+// 调用scheduler之前必须持有自身进程的锁
+// (调用sched的有 exit sleep yield(trap(interrupt exception syscall)) 都会锁上当前执行进程的lock)
+// 在scheduler的swtch(&c->context, &p->context);后开始执行 此时又释放当前进程的锁
+// 接下来在PCB数组中找就绪进程 找每个进程前锁进程PCB 进行调度后从进程进入调度器的exit/sleep/yield解锁
 void
 scheduler(void)
 {
@@ -606,9 +620,11 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup locks p->lock),
   // so it's okay to release lk.
-  if(lk != &p->lock){  //DOC: sleeplock0 预防对p->lock加锁导致死锁
-    acquire(&p->lock);  //DOC: sleeplock1
-    release(lk);        // 这里如果不解锁可能造成死锁 详见xv6 book中信号量的实现
+  // sleep持有p->lock，释放lk是安全的  其他进程可能会调用wakeup(chan)，
+  // 但wakeup会等待获得p->lock，因此会等到sleep将进程状态设置为SLEEPING，使wakeup不会错过sleep的进程
+  if(lk != &p->lock){  //DOC: sleeplock0 预防对p->lock加锁导致死锁  wait()不用进到判断体内
+    acquire(&p->lock);  //DOC: sleeplock1   进程调度需要对p加锁再调度   
+    release(lk);        // 使得releasesleep(或其他解chan的数据结构锁的函数)可以成功 但还需等待改变进程状态后再释放进程锁再wakeup再等待调度
   }
 
   // Go to sleep.     通过记录它的sleep channel和标记SLEEPING状态 将process作为睡眠
@@ -623,7 +639,7 @@ sleep(void *chan, struct spinlock *lk)
   // Reacquire original lock.
   if(lk != &p->lock){
     release(&p->lock);      // wakeup设置同chan的sleep proc为RUNNABLE待调度器恢复运行到sleep中sched后 scheduler挑选进程时加的锁在这里解锁
-    acquire(lk);            // 在开始sleep时放开的非进程锁在这里恢复加锁
+    acquire(lk);            // 在开始sleep时放开的非进程锁在这里恢复加锁 需要在acquiresleep中释放
   }
 }
 
@@ -635,7 +651,7 @@ wakeup(void *chan)
   struct proc *p;
 
   for(p = proc; p < &proc[NPROC]; p++) {
-    acquire(&p->lock);
+    acquire(&p->lock);      // 对每个进程加锁 防止sleep处理时进程p->state还
     if(p->state == SLEEPING && p->chan == chan) {
       p->state = RUNNABLE;
     }

@@ -27,12 +27,14 @@ initsleeplock(struct sleeplock *lk, char *name)
 void
 acquiresleep(struct sleeplock *lk)
 {
-  acquire(&lk->lk);
-  while (lk->locked) {
+  acquire(&lk->lk);       // 对信号量数据结构lk加锁是为了防止while条件在使用lk->locked后releasesleep解睡眠锁 导致判断条件时值为1 进入循环时值为0 最终导致进程永久睡眠
+                          // 它保证了没有其他进程可以调用wakeup(chan)
+  while (lk->locked) {    // r防止lose wakeup
     sleep(lk, &lk->lk);   // 睡眠锁实现原理与Linux Mutex实现一样，当同一锁被二次争用时陷入到睡眠，睡眠中实现被调度
                           // https://blog.csdn.net/21cnbao/article/details/119708595
   }
-  lk->locked = 1;
+  // 能执行到这里说明抢锁成功
+  lk->locked = 1;         // 后续抢锁的进来就会进入上面的循环
   lk->pid = myproc()->pid;
   release(&lk->lk);
 }
@@ -48,7 +50,7 @@ acquiresleep(struct sleeplock *lk)
 void
 releasesleep(struct sleeplock *lk)
 {
-  acquire(&lk->lk);
+  acquire(&lk->lk);   // 防止在acquiresleep时修改睡眠锁状态导致线程永久睡眠
   lk->locked = 0;
   lk->pid = 0;
   wakeup(lk);
