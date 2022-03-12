@@ -57,9 +57,7 @@ void put(int key, int value)
     if (e->key == key)
       break;
   }
-  pthread_mutex_unlock(&lock_hash_table_bucket[i]);
-  
-  pthread_mutex_lock(&lock_hash_table_bucket[i]);
+
   if(e){
     // update the existing key.
     e->value = value;
