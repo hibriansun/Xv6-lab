@@ -623,7 +623,7 @@ sleep(void *chan, struct spinlock *lk)
   // sleep持有p->lock，释放lk是安全的  其他进程可能会调用wakeup(chan)，
   // 但wakeup会等待获得p->lock，因此会等到sleep将进程状态设置为SLEEPING，使wakeup不会错过sleep的进程
   if(lk != &p->lock){  //DOC: sleeplock0 预防对p->lock加锁导致死锁  wait()不用进到判断体内
-    acquire(&p->lock);  //DOC: sleeplock1   进程调度需要对p加锁再调度   
+    acquire(&p->lock);  //DOC: sleeplock1   保证此时V操作无法进行 之后进行时若进程还没进入睡眠状态就在wakeup中选进程唤醒时先spin在进程锁上 等待P操作进入sched()释放进程锁 防止lose wakeup(在P操作的p还未完成状态改变为sleep时，V的wakeup就已经遍历完所有进程列表导致本次wakeup找不到任何可唤醒进程 在此之后P操作进程因为没有新的wakeup就进入了永久睡眠 如果这里对进程加锁后再允许V操作进行++并唤醒，那么在wakeup时发现这里进入sleep态还没完成 那就等待这里完成进入睡眠并在sched中释放进程锁后再争进程锁成功并进行唤醒)
     release(lk);        // 使得releasesleep(或其他解chan的数据结构锁的函数)可以成功 但还需等待改变进程状态后再释放进程锁再wakeup再等待调度
   }
 
