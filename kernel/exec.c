@@ -9,6 +9,10 @@
 
 static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uint sz);
 
+// 两种执行流
+// 1. initcode --> exec("/init") --> (syscall)exec()  <the first process>
+// 2. fork --> exec
+// 3. others' invoking directly
 int
 exec(char *path, char **argv)
 {
@@ -38,6 +42,9 @@ exec(char *path, char **argv)
   if(elf.magic != ELF_MAGIC)
     goto bad;
 
+  // exec会使我们丢弃原来的进程虚拟地址空间的内容
+  // 重新填充新的程序到进程虚拟地址空间并新建页表映射
+  // 使得程序 --> 进程
   // 给进程分配一个仅map trampoline and trapframe的页表
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
@@ -71,6 +78,7 @@ exec(char *path, char **argv)
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
   // 两个PGSIZE大小 一个用作guard page(防止stack overflow伤及其他区域) 一个用于用户栈()
+  // >>>> 我们在exec时再分配新的栈空间，这也是第一个用户进程(二进制代码的内容exec("/init")来到的地方，在此之前是没有用户函数调用栈的 全靠寄存器) <<<<
   sz = PGROUNDUP(sz);
   uint64 sz1;
   if((sz1 = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)

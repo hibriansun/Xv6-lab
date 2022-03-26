@@ -39,6 +39,9 @@
 // 按照一定的规则(LRU)在选出新的空闲的buffer节点场景下，最近被线程操作结束很可能再次有线程来访问的放在链表靠前位置，
 // 已经被线程操作并释放完很久的buffer节点位于链表的末端，这就是我们选择新buffer供予新disk数据分配的目标。
 
+// 非常好的关于LRU的思考
+// https://www.cnblogs.com/KatyuMarisaBlog/p/14366115.html#%E5%85%B3%E4%BA%8E%E7%BC%93%E5%86%B2%E5%8C%BA%E7%BD%AE%E6%8D%A2%E7%AE%97%E6%B3%95%E7%9A%84%E4%B8%80%E4%BA%9B%E6%80%9D%E8%80%83
+
 struct {
   struct spinlock lock;   // protects `information`(not buffer content) which blocks are cached
                           // 例如我们要从buffer cache中选一个struct buf出来放data block (bget())，那么需要要在此期间加锁保证操作原子性
@@ -48,7 +51,7 @@ struct {
   // Sorted by how recently the buffer was used.
   // head.next is most recent, head.prev is least.
   struct buf head;      // dummy head node
-} bcache;
+} bcache;         // 在遍历buf的链表、访问buf除了data段的成员时(全部buf)，都需要持有着bcache.lock
 
 void
 binit(void)
@@ -85,13 +88,14 @@ bget(uint dev, uint blockno)
       b->refcnt++;      // ensure that no more one data block occupies the struct buf 
                         // after one data block chose and releasing bcache.lock
       release(&bcache.lock);
-      acquiresleep(&b->lock);
+      acquiresleep(&b->lock);   // 以防止其他进程对这个buf进行读写操作，这样就达到了同步多进程对盘块的读写操作的目的(brelse解锁)
       return b;
     }
   }
 
   // Not cached.
   // Recycle the least recently used (LRU) unused buffer.
+  // 逆序遍历
   for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
     if(b->refcnt == 0) {     // ensure that no more one data block occupies the struct buf 
                              // after one data block chose and releasing bcache.lock
