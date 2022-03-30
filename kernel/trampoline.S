@@ -13,6 +13,15 @@
 trampoline:
 .align 4
 .globl uservec
+
+
+        # 进入trap前的硬件行为
+        # 1. User Mode --> **Supervisor Mode** （**特权位**） 
+        # （下一步后可以通过查看程序计数器现在正在trampoline page执行代码，而这些page对应的PTE并没有设置PTE_u标志位）
+        #
+        # 2. 将用户程序程序计数器**PC**的值保存在了**SEPC(Supervisor Exception Program Counter)**寄存器，
+        # 接着将 PC 设置成了STVEC中的**trampoline page地址** (位于用户虚拟内存中用来进入内核的蹦床)，接着从PC这里执行指令
+
 uservec:    
 	#
         # trap.c sets stvec to point here, so
