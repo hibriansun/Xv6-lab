@@ -222,3 +222,8 @@ int             sockread(struct sock *, uint64, int);
 int             sockwrite(struct sock *, uint64, int);
 void            sockrecvudp(struct mbuf*, uint32, uint16, uint16);
 #endif
+
+// semaphore.c
+void            initsemaphore(struct semaphore *sema, char *name, uint capacity);
+void            sema_p(struct semaphore *sema);
+void            sema_v(struct semaphore *sema);
