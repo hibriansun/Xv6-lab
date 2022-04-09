@@ -80,6 +80,8 @@ kvminithart()
 
 // 模仿RISC-V分页硬件查找虚拟地址的PTE。walk每次降低3级页表的9位。
 // 它使用每一级的9位虚拟地址来查找下一级页表或最后一级（kernel/vm.c:78）的PTE。
+// **为什么要采用9位虚拟地址索引一个页表页的PTE呢？**
+//  2^9 = 512，一个页表页4K，一个页表项64位(8bytes)，那么一个页表页有512个页表项，正好可以使用512个地址给每个PTE索引
 // 如果PTE无效，那么所需的物理页还没有被分配；如果alloc参数被设置true，walk会分配一个新的页表页，
 // 并把它的物理地址放在PTE中。它返回在`树的最低层`的PTE地址 (It returns the address of the PTE in the lowest layer in the tree)
 pte_t *
@@ -446,6 +448,8 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 }
 
 void vmprint(pagetable_t pt, int level) {
+  printf("Addr: %p\n", pt);
+  
   // A pagetable page contains 512 PTEs
   for (int i = 0; i < 512; i++) {
     pte_t pte = pt[i];
