@@ -45,6 +45,7 @@ kernelvec:
         sd t6, 240(sp)
 
 	// call the C trap handler in trap.c
+        // then, we continue to excuting the following codes 
         call kerneltrap
 
         // restore registers.
