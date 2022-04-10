@@ -10,6 +10,12 @@
 #include "proc.h"
 #include "defs.h"
 
+// 低配版Lockdep
+// 不必大费周章统计加锁顺序从而检测是否有环(**有可能**死锁)
+// 统计争用同一锁的次数 大于一个明显不正常的数值就报告
+// 配合GDB在panic上打断点 再看线程的backtrace诊断死锁
+#define LOCKDEP
+
 void
 initlock(struct spinlock *lk, char *name)
 {
@@ -29,6 +35,11 @@ acquire(struct spinlock *lk)
   if(holding(lk))
     panic("acquire");       // 检测死锁
 
+#ifdef LOCKDEP
+#define SPIN_LIMIT (1000000000)
+  int spin_cnt = 1;
+#endif
+
   // On RISC-V, sync_lock_test_and_set turns into an atomic swap:
   //   a5 = 1
   //   s1 = &lk->locked
@@ -41,7 +52,13 @@ acquire(struct spinlock *lk)
   // 对于synchronize指令，任何在它之前的load/store指令，都不能移动到它之后
   // TEST_AND_SET: 将新值设定到变量上并返回变量旧值
   while(__sync_lock_test_and_set(&lk->locked, 1) != 0)      // 实现自旋 与 原子占用操作
-    ;
+  {
+    #ifdef LOCKDEP
+      if (spin_cnt++ > SPIN_LIMIT) {
+        panic("Too many spin!");
+      }
+    #endif
+  }
 
   // Tell the C compiler and the processor to not move loads or stores
   // past this point, to ensure that the critical section's memory
