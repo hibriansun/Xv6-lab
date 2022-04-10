@@ -11,7 +11,7 @@ void
 main()
 {
   if(cpuid() == 0){  // 第一个核启动走这里
-    consoleinit();   // 初始化控制台设备能接收 设备(外部)中断、软件中断、定时器中断
+    consoleinit();   // 初始化控制台设备让CPU0来接收控制台的 设备(外部)中断、软件中断、定时器中断
     printfinit();
     printf("\n");
     printf("xv6 kernel is booting\n");
@@ -41,5 +41,5 @@ main()
     plicinithart();   // ask PLIC for device interrupts
   }
 
-  scheduler();        
+  scheduler();        // 每个CPU都会执行调度 初始只有一个用户进程那只有一个核可以选到并运行 其他核遍历完就绪队列发现为空就idle了
 }
