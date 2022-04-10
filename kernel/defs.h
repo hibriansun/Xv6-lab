@@ -12,6 +12,7 @@ struct superblock;
 struct mbuf;
 struct sock;
 #endif
+struct semaphore;
 
 // bio.c
 void            binit(void);
