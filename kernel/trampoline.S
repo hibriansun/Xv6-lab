@@ -35,6 +35,7 @@ uservec:
         
 	# swap a0 and sscratch
         # so that a0 is TRAPFRAME
+        # sscratch在userret的最后被重新设置为trapframe的地址
         csrrw a0, sscratch, a0
 
         # save the user registers in TRAPFRAME
